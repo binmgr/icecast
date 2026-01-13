@@ -142,7 +142,7 @@ jobs:
 
           # Build libigloo with pthread flags (musl has pthread built into libc)
           git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git
-          cd icecast-libigloo && autoreconf -fi && CFLAGS="-Os -fPIC -pthread" LDFLAGS="-pthread" PTHREAD_CFLAGS="-pthread" PTHREAD_LIBS="-pthread" ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} CFLAGS="-Os -fPIC -static" LDFLAGS="-static" && make install && cd "${BUILD_DIR}"
+          cd icecast-libigloo && autoreconf -fi && env -u CFLAGS -u LDFLAGS -u CXXFLAGS PKG_CONFIG_PATH="${PKG_CONFIG_PATH}" CFLAGS="-Os -fPIC -pthread" LDFLAGS="-pthread" PTHREAD_CFLAGS="-pthread" PTHREAD_LIBS="-pthread" ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} CFLAGS="-Os -fPIC -static" LDFLAGS="-static" && make install && cd "${BUILD_DIR}"
 
           echo "=========================================="
           echo "Building icecast"
