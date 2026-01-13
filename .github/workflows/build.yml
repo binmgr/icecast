@@ -54,8 +54,10 @@ jobs:
           mkdir -p "${BUILD_DIR}"
           cd "${BUILD_DIR}"
 
-          # Install libxslt (not in toolchain yet)
-          apk add --no-cache libxslt-dev libxslt-static
+          # Install missing static libraries
+          apk add --no-cache \
+            libxslt-dev libxslt-static \
+            libogg-static libvorbis-static libtheora-static
 
           # Library versions (only need to build what's not in the toolchain)
           LIBMAXMINDDB_VERSION="1.11.0"
