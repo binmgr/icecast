@@ -43,6 +43,8 @@ jobs:
             gzip
             bzip2
             xz
+            linux-headers
+            autoconf-archive
 
       - name: Build all dependencies and icecast
         run: |
