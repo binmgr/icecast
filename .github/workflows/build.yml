@@ -43,6 +43,8 @@ jobs:
 
           # Set PKG_CONFIG_PATH for libraries we build
           export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          # Tell pkg-config to return static library flags
+          export PKG_CONFIG="pkg-config --static"
 
           # Set host for cross-compilation
           if [ "${{ matrix.arch }}" = "aarch64" ]; then
@@ -139,8 +141,7 @@ jobs:
           export PATH="$SAVED_PATH"
 
           # Build statically by adding -static to existing flags from configure
-          # Add nghttp2 explicitly since curl depends on it
-          make -j${JOBS} AM_CFLAGS="-static" AM_LDFLAGS="-static -all-static" LIBS="-lnghttp2"
+          make -j${JOBS} AM_CFLAGS="-static" AM_LDFLAGS="-static -all-static"
           strip src/icecast
 
           # Rename binary for distribution
