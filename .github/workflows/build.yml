@@ -141,7 +141,7 @@ jobs:
           cd libmaxminddb-${LIBMAXMINDDB_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git
-          cd icecast-libigloo && autoreconf -fi && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd "${BUILD_DIR}"
+          cd icecast-libigloo && autoreconf -fi && CFLAGS="-Os -fPIC" LDFLAGS="" ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           echo "=========================================="
           echo "Building icecast"
