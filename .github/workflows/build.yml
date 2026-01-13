@@ -41,6 +41,13 @@ jobs:
           BUILD_DIR="/workspace/build"
           JOBS=$(nproc)
 
+          # Set host for cross-compilation
+          if [ "${{ matrix.arch }}" = "aarch64" ]; then
+            HOST_FLAG="--host=aarch64-linux-musl"
+          else
+            HOST_FLAG=""
+          fi
+
           mkdir -p "${BUILD_DIR}"
           cd "${BUILD_DIR}"
 
@@ -54,9 +61,9 @@ jobs:
           # Build librhash (not in standard Alpine repos)
           git clone --depth 1 https://github.com/rhash/RHash.git
           cd RHash
-          ./configure --prefix="${PREFIX}" --enable-static
-          make -j${JOBS} lib-static
-          make install-lib-static install-lib-headers
+          # RHash configure doesn't work well with cross-compile, so build directly
+          make -j${JOBS} CC="${CC}" lib-static
+          make PREFIX="${PREFIX}" install-lib-static install-lib-headers
 
           # Create pkg-config file for librhash
           cat > "${PREFIX}/lib/pkgconfig/librhash.pc" <<'PKGEOF'
@@ -78,7 +85,7 @@ jobs:
           curl -L -o libmaxminddb.tar.gz "https://github.com/maxmind/libmaxminddb/releases/download/${LIBMAXMINDDB_VERSION}/libmaxminddb-${LIBMAXMINDDB_VERSION}.tar.gz"
           tar xzf libmaxminddb.tar.gz
           cd libmaxminddb-${LIBMAXMINDDB_VERSION}
-          ./configure --prefix="${PREFIX}" --disable-shared --enable-static
+          ./configure --prefix="${PREFIX}" --disable-shared --enable-static ${HOST_FLAG}
           make -j${JOBS}
           make install
           cd "${BUILD_DIR}"
@@ -87,7 +94,7 @@ jobs:
           git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git
           cd icecast-libigloo
           autoreconf -fi
-          ./configure --prefix="${PREFIX}" --disable-shared --enable-static
+          ./configure --prefix="${PREFIX}" --disable-shared --enable-static ${HOST_FLAG}
           make -j${JOBS}
           make install
           cd "${BUILD_DIR}"
@@ -113,7 +120,8 @@ jobs:
             --sysconfdir=/etc \
             --enable-yp \
             --enable-ipv6 \
-            --with-libmaxminddb="${PREFIX}"
+            --with-libmaxminddb="${PREFIX}" \
+            ${HOST_FLAG}
 
           make -j${JOBS}
           strip src/icecast
