@@ -120,15 +120,12 @@ jobs:
           VERSION=$(sed -n 's/^AC_INIT(\[Icecast\], \[\([0-9.]*\)\].*/\1/p' configure.ac || echo "2.5.0")
           echo "${VERSION}" > VERSION.txt
 
-          # Static build flags
-          export CFLAGS="-Os -static"
-          export LDFLAGS="-static"
-
           # Use system autotools and pkg-config, not Bootlin toolchain's broken ones
           SAVED_PATH="$PATH"
           export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           autoreconf -fi
-          ./configure \
+          # Configure without -static for pthread detection
+          CFLAGS="-Os" LDFLAGS="" ./configure \
             --prefix=/usr \
             --sysconfdir=/etc \
             --enable-yp \
@@ -137,7 +134,8 @@ jobs:
             ${HOST_FLAG}
           export PATH="$SAVED_PATH"
 
-          make -j${JOBS}
+          # Build with static flags
+          make -j${JOBS} CFLAGS="-Os -static" LDFLAGS="-static"
           strip src/icecast
 
           # Rename binary for distribution
