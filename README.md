@@ -29,6 +29,8 @@ All optional features are compiled in:
 - ✅ Speex codec support (libspeex)
 - ✅ TLS/SSL support (OpenSSL)
 - ✅ YP directory support (libcurl)
+- ✅ GeoIP location lookups (libmaxminddb)
+- ✅ IPv6 support
 - ✅ Authentication and admin interface
 
 ### Static Binaries
@@ -40,6 +42,7 @@ Built with [musl libc](https://musl.libc.org/) on Alpine Linux:
 - XML processing (libxml2, libxslt)
 - SSL/TLS support (OpenSSL)
 - HTTP client (libcurl)
+- GeoIP lookups (libmaxminddb)
 - All dependencies
 
 ## Downloads
@@ -155,7 +158,7 @@ This repository contains only the GitHub Actions workflow for automated builds. 
 
 1. **Triggers**: Builds run on push to main/master, monthly on the 1st at 00:00 UTC, or manually
 2. **Platform**: Linux (Alpine/musl)
-3. **Dependencies**: 11 libraries built from source statically
+3. **Dependencies**: 12 libraries built from source statically
 4. **Icecast**: Built with all features enabled
 5. **Release**: Automatic GitHub release with version from upstream
 
@@ -172,6 +175,7 @@ For each platform:
 - libcurl (HTTP client)
 - libxml2 (XML parsing)
 - libxslt (XSLT processing)
+- libmaxminddb (GeoIP lookups)
 - libigloo (Icecast common framework)
 - Icecast (with all of the above)
 

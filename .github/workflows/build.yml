@@ -64,6 +64,7 @@ jobs:
           CURL_VERSION="8.5.0"
           LIBXML2_VERSION="2.12.3"
           LIBXSLT_VERSION="1.1.39"
+          LIBMAXMINDDB_VERSION="1.11.0"
 
           export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
           export CFLAGS="-Os -fPIC -static"
@@ -120,6 +121,9 @@ jobs:
           download_extract "https://download.gnome.org/sources/libxslt/1.1/libxslt-${LIBXSLT_VERSION}.tar.xz" "libxslt.tar.xz"
           cd libxslt-${LIBXSLT_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static --without-python --with-libxml-prefix="${PREFIX}" && make -j${JOBS} && make install && cd ..
 
+          download_extract "https://github.com/maxmind/libmaxminddb/releases/download/${LIBMAXMINDDB_VERSION}/libmaxminddb-${LIBMAXMINDDB_VERSION}.tar.gz" "libmaxminddb.tar.gz"
+          cd libmaxminddb-${LIBMAXMINDDB_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd ..
+
           git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git
           cd icecast-libigloo && autoreconf -fi && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd ..
 
@@ -142,6 +146,8 @@ jobs:
           ./configure \
             --prefix=/usr \
             --sysconfdir=/etc \
+            --enable-yp \
+            --enable-ipv6 \
             --with-curl-config="${PREFIX}/bin/curl-config" \
             --with-xml-config="${PREFIX}/bin/xml2-config" \
             --with-xslt-config="${PREFIX}/bin/xslt-config" \
@@ -149,7 +155,8 @@ jobs:
             --with-vorbis="${PREFIX}" \
             --with-theora="${PREFIX}" \
             --with-speex="${PREFIX}" \
-            --with-openssl="${PREFIX}"
+            --with-openssl="${PREFIX}" \
+            --with-libmaxminddb="${PREFIX}"
 
           make -j${JOBS}
           mv src/icecast src/icecast-bin
@@ -268,6 +275,8 @@ jobs:
             ✅ Speex codec support
             ✅ TLS/SSL support (OpenSSL)
             ✅ YP directory support (libcurl)
+            ✅ GeoIP location lookups (libmaxminddb)
+            ✅ IPv6 support
             ✅ Authentication and admin interface
 
             ## Downloads
