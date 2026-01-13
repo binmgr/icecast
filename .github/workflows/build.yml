@@ -140,18 +140,9 @@ jobs:
           download_extract "https://github.com/maxmind/libmaxminddb/releases/download/${LIBMAXMINDDB_VERSION}/libmaxminddb-${LIBMAXMINDDB_VERSION}.tar.gz" "libmaxminddb.tar.gz"
           cd libmaxminddb-${LIBMAXMINDDB_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
-          # Save global flags and build libigloo without -static for pthread detection
-          SAVED_CFLAGS="$CFLAGS"
-          SAVED_LDFLAGS="$LDFLAGS"
-          export CFLAGS="-Os -fPIC"
-          export LDFLAGS=""
-
+          # Build libigloo with pthread flags (musl has pthread built into libc)
           git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git
-          cd icecast-libigloo && autoreconf -fi && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd "${BUILD_DIR}"
-
-          # Restore global flags
-          export CFLAGS="$SAVED_CFLAGS"
-          export LDFLAGS="$SAVED_LDFLAGS"
+          cd icecast-libigloo && autoreconf -fi && CFLAGS="-Os -fPIC -pthread" LDFLAGS="-pthread" PTHREAD_CFLAGS="-pthread" PTHREAD_LIBS="-pthread" ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} CFLAGS="-Os -fPIC -static" LDFLAGS="-static" && make install && cd "${BUILD_DIR}"
 
           echo "=========================================="
           echo "Building icecast"
