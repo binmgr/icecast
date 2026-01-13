@@ -139,7 +139,8 @@ jobs:
           export PATH="$SAVED_PATH"
 
           # Build statically by adding -static to existing flags from configure
-          make -j${JOBS} AM_CFLAGS="-static" AM_LDFLAGS="-static -all-static"
+          # Add nghttp2 explicitly since curl depends on it
+          make -j${JOBS} AM_CFLAGS="-static" AM_LDFLAGS="-static -all-static" LIBS="-lnghttp2"
           strip src/icecast
 
           # Rename binary for distribution
