@@ -50,9 +50,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          PREFIX="/usr"
+          PREFIX="/tmp/icecast-prefix"
           BUILD_DIR="/tmp/icecast-build"
           JOBS=$(nproc)
+
+          mkdir -p "${PREFIX}"
 
           # Library versions
           ZLIB_VERSION="1.3.1"
@@ -92,40 +94,40 @@ jobs:
 
           # Build all dependencies
           download_extract "https://zlib.net/zlib-${ZLIB_VERSION}.tar.gz" "zlib.tar.gz"
-          cd zlib-${ZLIB_VERSION} && ./configure --prefix="${PREFIX}" --static && make -j${JOBS} && make install && cd ..
+          cd zlib-${ZLIB_VERSION} && ./configure --prefix="${PREFIX}" --static && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           download_extract "https://downloads.xiph.org/releases/ogg/libogg-${OGG_VERSION}.tar.xz" "libogg.tar.xz"
-          cd libogg-${OGG_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd ..
+          cd libogg-${OGG_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           download_extract "https://downloads.xiph.org/releases/vorbis/libvorbis-${VORBIS_VERSION}.tar.xz" "libvorbis.tar.xz"
-          cd libvorbis-${VORBIS_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static --with-ogg="${PREFIX}" && make -j${JOBS} && make install && cd ..
+          cd libvorbis-${VORBIS_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static --with-ogg="${PREFIX}" && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           download_extract "https://downloads.xiph.org/releases/theora/libtheora-${THEORA_VERSION}.tar.bz2" "libtheora.tar.bz2"
-          cd libtheora-${THEORA_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static --with-ogg="${PREFIX}" --disable-examples && make -j${JOBS} && make install && cd ..
+          cd libtheora-${THEORA_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static --with-ogg="${PREFIX}" --disable-examples && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           download_extract "https://downloads.xiph.org/releases/speex/speex-${SPEEX_VERSION}.tar.gz" "speex.tar.gz"
-          cd speex-${SPEEX_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd ..
+          cd speex-${SPEEX_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           git clone --depth 1 https://github.com/rhash/RHash.git
-          cd RHash && ./configure --prefix="${PREFIX}" --enable-static --disable-shared && make -j${JOBS} lib-static && make install-lib-static install-lib-headers && cd ..
+          cd RHash && ./configure --prefix="${PREFIX}" --enable-static --disable-shared && make -j${JOBS} lib-static && make install-lib-static install-lib-headers && cd "${BUILD_DIR}"
 
           download_extract "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" "openssl.tar.gz"
-          cd openssl-${OPENSSL_VERSION} && ./config --prefix="${PREFIX}" --openssldir="${PREFIX}/ssl" no-shared no-ssl3 no-weak-ssl-ciphers -static && make -j${JOBS} && make install_sw install_ssldirs && cd ..
+          cd openssl-${OPENSSL_VERSION} && ./config --prefix="${PREFIX}" --openssldir="${PREFIX}/ssl" no-shared no-ssl3 no-weak-ssl-ciphers -static && make -j${JOBS} && make install_sw install_ssldirs && cd "${BUILD_DIR}"
 
           download_extract "https://curl.se/download/curl-${CURL_VERSION}.tar.gz" "curl.tar.gz"
-          cd curl-${CURL_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static --with-openssl="${PREFIX}" --without-librtmp --without-libssh2 --disable-ldap && make -j${JOBS} && make install && cd ..
+          cd curl-${CURL_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static --with-openssl="${PREFIX}" --without-librtmp --without-libssh2 --disable-ldap && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           download_extract "https://download.gnome.org/sources/libxml2/2.12/libxml2-${LIBXML2_VERSION}.tar.xz" "libxml2.tar.xz"
-          cd libxml2-${LIBXML2_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static --without-python --without-readline --without-lzma --without-zstd --with-zlib="${PREFIX}" && make -j${JOBS} && make install && cd ..
+          cd libxml2-${LIBXML2_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static --without-python --without-readline --without-lzma --without-zstd --with-zlib="${PREFIX}" && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           download_extract "https://download.gnome.org/sources/libxslt/1.1/libxslt-${LIBXSLT_VERSION}.tar.xz" "libxslt.tar.xz"
-          cd libxslt-${LIBXSLT_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static --without-python --with-libxml-prefix="${PREFIX}" && make -j${JOBS} && make install && cd ..
+          cd libxslt-${LIBXSLT_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static --without-python --with-libxml-prefix="${PREFIX}" && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           download_extract "https://github.com/maxmind/libmaxminddb/releases/download/${LIBMAXMINDDB_VERSION}/libmaxminddb-${LIBMAXMINDDB_VERSION}.tar.gz" "libmaxminddb.tar.gz"
-          cd libmaxminddb-${LIBMAXMINDDB_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd ..
+          cd libmaxminddb-${LIBMAXMINDDB_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git
-          cd icecast-libigloo && autoreconf -fi && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd ..
+          cd icecast-libigloo && autoreconf -fi && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
           echo "=========================================="
           echo "Building icecast"
