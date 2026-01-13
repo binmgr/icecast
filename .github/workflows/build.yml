@@ -58,8 +58,7 @@ jobs:
           apk add --no-cache \
             libxslt-dev libxslt-static \
             libogg-static libvorbis-static libtheora-static \
-            nghttp2-static \
-            speex-dev
+            nghttp2-static
 
           # Library versions (only need to build what's not in the toolchain)
           LIBMAXMINDDB_VERSION="1.11.0"
@@ -134,6 +133,7 @@ jobs:
             --sysconfdir=/etc \
             --enable-yp \
             --enable-ipv6 \
+            --without-speex \
             --with-libmaxminddb="${PREFIX}" \
             ${HOST_FLAG}
           export PATH="$SAVED_PATH"
