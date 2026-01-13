@@ -54,7 +54,7 @@ jobs:
           # Build librhash (not in standard Alpine repos)
           git clone --depth 1 https://github.com/rhash/RHash.git
           cd RHash
-          ./configure --prefix="${PREFIX}" --enable-static --disable-shared
+          ./configure --prefix="${PREFIX}" --enable-static
           make -j${JOBS} lib-static
           make install-lib-static install-lib-headers
 
