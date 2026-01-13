@@ -134,8 +134,8 @@ jobs:
             ${HOST_FLAG}
           export PATH="$SAVED_PATH"
 
-          # Build with static flags
-          make -j${JOBS} CFLAGS="-Os -static" LDFLAGS="-static"
+          # Build statically by adding -static to existing flags from configure
+          make -j${JOBS} AM_CFLAGS="-static" AM_LDFLAGS="-static -all-static"
           strip src/icecast
 
           # Rename binary for distribution
