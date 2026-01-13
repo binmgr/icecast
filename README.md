@@ -157,33 +157,31 @@ This repository contains only the GitHub Actions workflow for automated builds. 
 ### How It Works
 
 1. **Triggers**: Builds run on push to main/master, monthly on the 1st at 00:00 UTC, or manually
-2. **Platform**: Linux (Alpine/musl)
-3. **Dependencies**: 12 libraries built from source statically
+2. **Platform**: Uses [binmgr/toolchain](https://github.com/binmgr/toolchain) Docker image (Alpine/musl)
+3. **Dependencies**: Pre-installed in toolchain + librhash, libmaxminddb, and libigloo built from source
 4. **Icecast**: Built with all features enabled
 5. **Release**: Automatic GitHub release with version from upstream
 
 ### What Gets Built
 
-For each platform:
-- zlib (compression)
-- libogg (audio container)
-- libvorbis (Vorbis codec)
-- libtheora (Theora video codec)
-- libspeex (Speex codec)
-- librhash (hash functions)
+**From [binmgr/toolchain](https://github.com/binmgr/toolchain) (pre-installed):**
+- zlib, libogg, libvorbis, libtheora, libspeex (codecs)
 - OpenSSL (TLS/SSL)
 - libcurl (HTTP client)
-- libxml2 (XML parsing)
-- libxslt (XSLT processing)
+- libxml2, libxslt (XML/XSLT)
+- All standard build tools and compilers
+
+**Built from source:**
+- librhash (hash functions)
 - libmaxminddb (GeoIP lookups)
 - libigloo (Icecast common framework)
-- Icecast (with all of the above)
+- Icecast (with all features enabled)
 
 ### Build Times
 
 Approximate build times per platform:
-- **Linux x86_64**: ~45-60 minutes
-- **Linux aarch64**: ~60-90 minutes (QEMU emulation)
+- **Linux x86_64**: ~5-10 minutes (native)
+- **Linux aarch64**: ~5-10 minutes (cross-compile)
 
 ## Platform Compatibility
 
@@ -255,56 +253,40 @@ For issues with:
 - **Icecast itself**: Report to [upstream](https://gitlab.xiph.org/xiph/icecast-server/issues)
 - **These builds**: Report to [this repository](../../issues)
 
-## Local Testing with `act`
+## Local Testing with Docker
 
-Test workflows locally using [`act`](https://github.com/nektos/act) to avoid consuming GitHub Actions minutes.
-
-### Installation
-
-**macOS:**
-```bash
-brew install act
-```
-
-**Linux:**
-```bash
-curl https://raw.githubusercontent.com/nektos/act/master/install.sh | sudo bash
-```
-
-**Windows:**
-```bash
-choco install act-cli
-```
+Test builds locally using the [binmgr/toolchain](https://github.com/binmgr/toolchain) Docker image.
 
 ### Quick Start
 
-**Test Linux x86_64 build:**
+**Pull the toolchain:**
 ```bash
-act -j build-linux --matrix arch:x86_64
+docker pull ghcr.io/binmgr/toolchain:latest
 ```
 
-**Test Linux aarch64 build:**
+**Build Icecast (Linux x86_64):**
 ```bash
-act -j build-linux --matrix arch:aarch64
+docker run --rm -v $(pwd):/workspace ghcr.io/binmgr/toolchain:latest sh -c '
+  # Run the build script (simplified example)
+  cd /workspace
+  # ... build commands from workflow ...
+'
 ```
 
-**List all jobs:**
+**Build for Linux ARM64 (cross-compile):**
 ```bash
-act -l
+docker run --rm -v $(pwd):/workspace ghcr.io/binmgr/toolchain:latest sh -c '
+  export CC=aarch64-linux-gcc
+  export CXX=aarch64-linux-g++
+  # ... build commands ...
+'
 ```
 
 ### Expected Build Times
 
 | Build | Time | Notes |
 |-------|------|-------|
-| Linux x86_64 | ~45-60 min | Native architecture |
-| Linux aarch64 | ~60-90 min | QEMU emulation (slower) |
+| Linux x86_64 | ~5-10 min | Native build in container |
+| Linux aarch64 | ~5-10 min | Cross-compile with pre-built toolchain |
 
-### GitHub Actions Minutes Savings
-
-Testing locally with `act` saves:
-- **Initial development**: ~100-150 minutes per full run
-- **Each iteration**: ~100-150 minutes per push
-- **Total savings**: 500+ minutes during development
-
-With the free tier's 2000 minutes/month, local testing lets you develop unlimited times locally and only use GitHub Actions for final validation.
+The toolchain image dramatically reduces build times by providing all standard dependencies pre-installed.
