@@ -111,6 +111,20 @@ jobs:
           git clone --depth 1 https://github.com/rhash/RHash.git
           cd RHash && ./configure --prefix="${PREFIX}" --enable-static --disable-shared && make -j${JOBS} lib-static && make install-lib-static install-lib-headers && cd "${BUILD_DIR}"
 
+          # Create pkg-config file for librhash (it doesn't provide one)
+          cat > "${PREFIX}/lib/pkgconfig/librhash.pc" <<EOF
+          prefix=${PREFIX}
+          exec_prefix=\${prefix}
+          libdir=\${exec_prefix}/lib
+          includedir=\${prefix}/include
+
+          Name: librhash
+          Description: Hash library
+          Version: 1.4.4
+          Libs: -L\${libdir} -lrhash
+          Cflags: -I\${includedir}
+          EOF
+
           download_extract "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" "openssl.tar.gz"
           cd openssl-${OPENSSL_VERSION} && ./config --prefix="${PREFIX}" --openssldir="${PREFIX}/ssl" no-shared no-ssl3 no-weak-ssl-ciphers -static && make -j${JOBS} && make install_sw install_ssldirs && cd "${BUILD_DIR}"
 
@@ -134,7 +148,7 @@ jobs:
           echo "=========================================="
 
           cd "${BUILD_DIR}"
-          git clone https://github.com/xiph/Icecast-Server.git
+          git clone --recursive https://github.com/xiph/Icecast-Server.git
           cd Icecast-Server
 
           VERSION=$(sed -n 's/^AC_INIT(\[Icecast\], \[\([0-9.]*\)\].*/\1/p' configure.ac || echo "2.5.0")
