@@ -121,12 +121,10 @@ jobs:
           export CFLAGS="-Os -static"
           export LDFLAGS="-static"
 
-          # Use system autotools, not Bootlin toolchain's broken ones
+          # Use system autotools and pkg-config, not Bootlin toolchain's broken ones
           SAVED_PATH="$PATH"
           export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
           autoreconf -fi
-          export PATH="$SAVED_PATH"
-
           ./configure \
             --prefix=/usr \
             --sysconfdir=/etc \
@@ -134,6 +132,7 @@ jobs:
             --enable-ipv6 \
             --with-libmaxminddb="${PREFIX}" \
             ${HOST_FLAG}
+          export PATH="$SAVED_PATH"
 
           make -j${JOBS}
           strip src/icecast
