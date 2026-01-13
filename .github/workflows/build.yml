@@ -66,6 +66,7 @@ jobs:
           make install-lib-static install-lib-headers
 
           # Create pkg-config file for librhash
+          mkdir -p "${PREFIX}/lib/pkgconfig"
           cat > "${PREFIX}/lib/pkgconfig/librhash.pc" <<'PKGEOF'
           prefix=/usr/local
           exec_prefix=${prefix}
