@@ -94,8 +94,11 @@ jobs:
           # Build libigloo (required by Icecast)
           git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git
           cd icecast-libigloo
-          # Use system autoreconf, not Bootlin toolchain's broken one
-          /usr/bin/autoreconf -fi
+          # Use system autotools, not Bootlin toolchain's broken ones
+          SAVED_PATH="$PATH"
+          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          autoreconf -fi
+          export PATH="$SAVED_PATH"
           ./configure --prefix="${PREFIX}" --disable-shared --enable-static ${HOST_FLAG}
           make -j${JOBS}
           make install
@@ -115,8 +118,11 @@ jobs:
           export CFLAGS="-Os -static"
           export LDFLAGS="-static"
 
-          # Use system autoreconf, not Bootlin toolchain's broken one
-          /usr/bin/autoreconf -fi
+          # Use system autotools, not Bootlin toolchain's broken ones
+          SAVED_PATH="$PATH"
+          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+          autoreconf -fi
+          export PATH="$SAVED_PATH"
 
           ./configure \
             --prefix=/usr \
