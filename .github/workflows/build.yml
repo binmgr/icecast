@@ -61,9 +61,9 @@ jobs:
           # Build librhash (not in standard Alpine repos)
           git clone --depth 1 https://github.com/rhash/RHash.git
           cd RHash
-          # RHash configure doesn't work well with cross-compile, so build directly
-          make -j${JOBS} CC="${CC}" lib-static
-          make PREFIX="${PREFIX}" install-lib-static install-lib-headers
+          ./configure --prefix="${PREFIX}" --enable-static --cc="${CC}"
+          make -j${JOBS} lib-static
+          make install-lib-static install-lib-headers
 
           # Create pkg-config file for librhash
           cat > "${PREFIX}/lib/pkgconfig/librhash.pc" <<'PKGEOF'
