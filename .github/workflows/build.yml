@@ -140,9 +140,18 @@ jobs:
           download_extract "https://github.com/maxmind/libmaxminddb/releases/download/${LIBMAXMINDDB_VERSION}/libmaxminddb-${LIBMAXMINDDB_VERSION}.tar.gz" "libmaxminddb.tar.gz"
           cd libmaxminddb-${LIBMAXMINDDB_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd "${BUILD_DIR}"
 
-          # Build libigloo with pthread flags (musl has pthread built into libc)
+          # Build libigloo - patch configure to skip pthread check (musl has pthread in libc)
           git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git
-          cd icecast-libigloo && autoreconf -fi && env -u CFLAGS -u LDFLAGS -u CXXFLAGS PKG_CONFIG_PATH="${PKG_CONFIG_PATH}" CFLAGS="-Os -fPIC -pthread" LDFLAGS="-pthread" PTHREAD_CFLAGS="-pthread" PTHREAD_LIBS="-pthread" ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} CFLAGS="-Os -fPIC -static" LDFLAGS="-static" && make install && cd "${BUILD_DIR}"
+          cd icecast-libigloo
+          autoreconf -fi
+          # Patch the configure script to accept pthread (musl libc has pthread built-in)
+          sed -i 's/configure: error: POSIX threads missing/configure: WARNING: Assuming pthread support (musl libc)/' configure
+          sed -i '/^  as_fn_error \$? "POSIX threads missing" "\$LINENO" 5$/d' configure
+          sed -i 's/test x"\$acx_pthread_ok" = xyes/true/' configure
+          env -u CFLAGS -u LDFLAGS -u CXXFLAGS PKG_CONFIG_PATH="${PKG_CONFIG_PATH}" CFLAGS="-Os -fPIC" LDFLAGS="" ./configure --prefix="${PREFIX}" --disable-shared --enable-static
+          make -j${JOBS} CFLAGS="-Os -fPIC -static" LDFLAGS="-static"
+          make install
+          cd "${BUILD_DIR}"
 
           echo "=========================================="
           echo "Building icecast"
