@@ -41,6 +41,9 @@ jobs:
           BUILD_DIR="/workspace/build"
           JOBS=$(nproc)
 
+          # Set PKG_CONFIG_PATH for libraries we build
+          export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+
           # Set host for cross-compilation
           if [ "${{ matrix.arch }}" = "aarch64" ]; then
             HOST_FLAG="--host=aarch64-linux-musl"
