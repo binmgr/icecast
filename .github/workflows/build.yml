@@ -54,6 +54,9 @@ jobs:
           mkdir -p "${BUILD_DIR}"
           cd "${BUILD_DIR}"
 
+          # Install libxslt (not in toolchain yet)
+          apk add --no-cache libxslt-dev libxslt-static
+
           # Library versions (only need to build what's not in the toolchain)
           LIBMAXMINDDB_VERSION="1.11.0"
 
