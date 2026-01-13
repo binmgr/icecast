@@ -107,7 +107,7 @@ jobs:
           cd speex-${SPEEX_VERSION} && ./configure --prefix="${PREFIX}" --disable-shared --enable-static && make -j${JOBS} && make install && cd ..
 
           git clone --depth 1 https://github.com/rhash/RHash.git
-          cd RHash && ./configure --prefix="${PREFIX}" --enable-static --disable-shared && make -j${JOBS} lib-static && make install-lib-static && cd ..
+          cd RHash && ./configure --prefix="${PREFIX}" --enable-static --disable-shared && make -j${JOBS} lib-static && make install-lib-static install-lib-headers && cd ..
 
           download_extract "https://www.openssl.org/source/openssl-${OPENSSL_VERSION}.tar.gz" "openssl.tar.gz"
           cd openssl-${OPENSSL_VERSION} && ./config --prefix="${PREFIX}" --openssldir="${PREFIX}/ssl" no-shared no-ssl3 no-weak-ssl-ciphers -static && make -j${JOBS} && make install_sw install_ssldirs && cd ..
@@ -135,7 +135,7 @@ jobs:
           git clone https://github.com/xiph/Icecast-Server.git
           cd Icecast-Server
 
-          VERSION=$(grep -Po 'AC_INIT\(\[Icecast\], \[\K[0-9.]+' configure.ac || echo "2.5.0")
+          VERSION=$(sed -n 's/^AC_INIT(\[Icecast\], \[\([0-9.]*\)\].*/\1/p' configure.ac || echo "2.5.0")
           echo "${VERSION}" > VERSION.txt
 
           export CFLAGS="-Os -I${PREFIX}/include"
