@@ -57,7 +57,8 @@ jobs:
           # Install missing static libraries
           apk add --no-cache \
             libxslt-dev libxslt-static \
-            libogg-static libvorbis-static libtheora-static
+            libogg-static libvorbis-static libtheora-static \
+            nghttp2-static speex-dev speex-static
 
           # Library versions (only need to build what's not in the toolchain)
           LIBMAXMINDDB_VERSION="1.11.0"
