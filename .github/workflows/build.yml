@@ -2,300 +2,82 @@ name: Build Static Icecast Binaries
 
 on:
   push:
-    branches:
-      - main
-      - master
+    branches: [main, master]
+    paths: ['docker/**', '.github/workflows/build.yml']
   schedule:
-    # Monthly on 1st at 00:00 UTC
-    - cron: '0 0 1 * *'
+    - cron: '0 0 1 */3 *'
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: binmgr/icecast
+
 jobs:
-  build-linux:
-    name: Build for Linux (${{ matrix.arch }})
+  build:
+    name: Build (${{ matrix.arch }})
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/binmgr/toolchain:latest
+      image: ghcr.io/binmgr/icecast:build
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: x86_64
-            cc: gcc
-            cxx: g++
-          - arch: aarch64
-            cc: aarch64-linux-gcc
-            cxx: aarch64-linux-g++
+        arch: [amd64, arm64]
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Build Icecast
-        run: |
-          set -euo pipefail
+        run: build-icecast ${{ matrix.arch }}
 
-          export CC=${{ matrix.cc }}
-          export CXX=${{ matrix.cxx }}
-
-          PREFIX="/usr/local"
-          BUILD_DIR="/workspace/build"
-          JOBS=$(nproc)
-
-          # Set PKG_CONFIG_PATH for libraries we build
-          export PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-          # Tell pkg-config to return static library flags
-          export PKG_CONFIG="pkg-config --static"
-
-          # Set host for cross-compilation
-          if [ "${{ matrix.arch }}" = "aarch64" ]; then
-            HOST_FLAG="--host=aarch64-linux-musl"
-          else
-            HOST_FLAG=""
-          fi
-
-          mkdir -p "${BUILD_DIR}"
-          cd "${BUILD_DIR}"
-
-          # Install missing static libraries
-          apk add --no-cache \
-            libxslt-dev libxslt-static \
-            libogg-static libvorbis-static libtheora-static \
-            nghttp2-static
-
-          # Library versions (only need to build what's not in the toolchain)
-          LIBMAXMINDDB_VERSION="1.11.0"
-
-          echo "=========================================="
-          echo "Building dependencies not in toolchain"
-          echo "=========================================="
-
-          # Build librhash (not in standard Alpine repos)
-          git clone --depth 1 https://github.com/rhash/RHash.git
-          cd RHash
-          ./configure --prefix="${PREFIX}" --enable-static --cc="${CC}"
-          make -j${JOBS} lib-static
-          make install-lib-static install-lib-headers
-
-          # Create pkg-config file for librhash
-          mkdir -p "${PREFIX}/lib/pkgconfig"
-          cat > "${PREFIX}/lib/pkgconfig/librhash.pc" <<'PKGEOF'
-          prefix=/usr/local
-          exec_prefix=${prefix}
-          libdir=${exec_prefix}/lib
-          includedir=${prefix}/include
-
-          Name: librhash
-          Description: Hash library
-          Version: 1.4.4
-          Libs: -L${libdir} -lrhash
-          Cflags: -I${includedir}
-          PKGEOF
-
-          cd "${BUILD_DIR}"
-
-          # Build libmaxminddb (for GeoIP support)
-          curl -L -o libmaxminddb.tar.gz "https://github.com/maxmind/libmaxminddb/releases/download/${LIBMAXMINDDB_VERSION}/libmaxminddb-${LIBMAXMINDDB_VERSION}.tar.gz"
-          tar xzf libmaxminddb.tar.gz
-          cd libmaxminddb-${LIBMAXMINDDB_VERSION}
-          ./configure --prefix="${PREFIX}" --disable-shared --enable-static ${HOST_FLAG}
-          make -j${JOBS}
-          make install
-          cd "${BUILD_DIR}"
-
-          # Build libigloo (required by Icecast)
-          git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git
-          cd icecast-libigloo
-          # Use system autotools, not Bootlin toolchain's broken ones
-          SAVED_PATH="$PATH"
-          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          autoreconf -fi
-          export PATH="$SAVED_PATH"
-          ./configure --prefix="${PREFIX}" --disable-shared --enable-static ${HOST_FLAG}
-          make -j${JOBS}
-          make install
-          cd "${BUILD_DIR}"
-
-          echo "=========================================="
-          echo "Building Icecast"
-          echo "=========================================="
-
-          git clone --recursive https://github.com/xiph/Icecast-Server.git
-          cd Icecast-Server
-
-          VERSION=$(sed -n 's/^AC_INIT(\[Icecast\], \[\([0-9.]*\)\].*/\1/p' configure.ac || echo "2.5.0")
-          echo "${VERSION}" > VERSION.txt
-
-          # Use system autotools and pkg-config, not Bootlin toolchain's broken ones
-          SAVED_PATH="$PATH"
-          export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-          autoreconf -fi
-          # Configure without -static for pthread detection
-          CFLAGS="-Os" LDFLAGS="" ./configure \
-            --prefix=/usr \
-            --sysconfdir=/etc \
-            --enable-yp \
-            --enable-ipv6 \
-            --without-speex \
-            --with-libmaxminddb="${PREFIX}" \
-            ${HOST_FLAG}
-          export PATH="$SAVED_PATH"
-
-          # Build statically by adding -static to existing flags from configure
-          make -j${JOBS} AM_CFLAGS="-static" AM_LDFLAGS="-static -all-static"
-          strip src/icecast
-
-          # Rename binary for distribution
-          mv src/icecast src/icecast-linux-${{ matrix.arch }}
-
-          echo "Build complete - Version: ${VERSION}"
-          ./src/icecast-linux-${{ matrix.arch }} -v || true
-          ldd src/icecast-linux-${{ matrix.arch }} || echo "Static binary"
-
-      - name: Extract version and create artifacts
-        run: |
-          VERSION=$(cat /workspace/build/Icecast-Server/VERSION.txt)
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-        id: version
-
-      - name: Create source archive
-        if: matrix.arch == 'x86_64'
-        run: |
-          cd /workspace/build/Icecast-Server
-          VERSION=$(cat VERSION.txt)
-          rm -rf .git .gitignore .github
-          cd /workspace/build
-          tar czf icecast-${VERSION}-src.tar.gz Icecast-Server/
-
-      - name: Upload artifacts
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: icecast-linux-${{ matrix.arch }}
-          path: /workspace/build/Icecast-Server/src/icecast-linux-${{ matrix.arch }}
+          path: /output/icecast-linux-${{ matrix.arch }}
 
-      - name: Upload source archive
-        if: matrix.arch == 'x86_64'
-        uses: actions/upload-artifact@v4
-        with:
-          name: source-archive
-          path: /workspace/build/icecast-*-src.tar.gz
-
-      - name: Upload version
-        uses: actions/upload-artifact@v4
-        with:
-          name: version-linux-${{ matrix.arch }}
-          path: /workspace/build/Icecast-Server/VERSION.txt
-
-  # Note: macOS, Windows, and FreeBSD builds would follow similar pattern
-  # For now, focusing on Linux builds which are most critical
-
-  create-release:
-    name: Create Release
-    needs: [build-linux]
+  release:
+    needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    permissions:
+      contents: write
+      packages: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
         with:
           path: artifacts
+          merge-multiple: true
 
       - name: Get version
-        id: version
-        run: |
-          VERSION=$(cat artifacts/version-linux-x86_64/VERSION.txt)
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Version: ${VERSION}"
+        id: ver
+        run: echo "version=$(cat artifacts/VERSION 2>/dev/null || echo '2.5.0')" >> $GITHUB_OUTPUT
 
-      - name: Organize artifacts
+      - name: Prepare release
         run: |
-          mkdir -p release
-          find artifacts -name 'icecast-*' -type f -exec cp {} release/ \;
-          ls -lh release/
-
-      - name: Create checksums
-        run: |
-          cd release
-          sha256sum icecast-* > SHA256SUMS.txt
-          cat SHA256SUMS.txt
-
-      - name: Delete existing release
-        run: |
-          if gh release view "v${{ steps.version.outputs.version }}" &> /dev/null; then
-            echo "Deleting existing release v${{ steps.version.outputs.version }}"
-            gh release delete "v${{ steps.version.outputs.version }}" -y
-            git push --delete origin "v${{ steps.version.outputs.version }}" || true
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
+          mkdir release && cp artifacts/icecast-* release/
+          chmod +x release/* && cd release && sha256sum * > checksums.txt
 
       - name: Create release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Icecast v${{ steps.version.outputs.version }}
-          body: |
-            # Icecast v${{ steps.version.outputs.version }} - Static Binaries for Linux
-
-            Truly static binaries for Icecast streaming server with all features enabled.
-
-            ## Features
-
-            ✅ XML configuration (libxml2, libxslt)
-            ✅ Ogg Vorbis streaming
-            ✅ Theora video streaming
-            ✅ Speex codec support
-            ✅ TLS/SSL support (OpenSSL)
-            ✅ YP directory support (libcurl)
-            ✅ GeoIP location lookups (libmaxminddb)
-            ✅ IPv6 support
-            ✅ Authentication and admin interface
-
-            ## Downloads
-
-            ### Linux (fully static with musl)
-            - [icecast-linux-x86_64](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/icecast-linux-x86_64)
-            - [icecast-linux-aarch64](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/icecast-linux-aarch64)
-
-            ### Source Archive
-            - [icecast-${{ steps.version.outputs.version }}-src.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/icecast-${{ steps.version.outputs.version }}-src.tar.gz)
-
-            ## Verification
-
-            [SHA256SUMS.txt](https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/SHA256SUMS.txt)
-
-            ```bash
-            sha256sum -c SHA256SUMS.txt --ignore-missing
-            ```
-
-            ## Quick Start
-
-            ```bash
-            # Download
-            wget https://github.com/${{ github.repository }}/releases/download/v${{ steps.version.outputs.version }}/icecast-linux-x86_64
-
-            # Make executable
-            chmod +x icecast-linux-x86_64
-
-            # Rename
-            mv icecast-linux-x86_64 icecast
-
-            # Run
-            ./icecast -c /etc/icecast.xml
-            ```
-
-            ---
-
-            **Source**: [xiph/Icecast-Server](https://github.com/xiph/Icecast-Server)
-          files: release/*
-          draft: false
-          prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete "v${{ steps.ver.outputs.version }}" --yes --cleanup-tag 2>/dev/null || true
+          gh release create "v${{ steps.ver.outputs.version }}" --title "Icecast ${{ steps.ver.outputs.version }}" \
+            --notes "Static Icecast binaries (musl)" release/*
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: cp release/icecast-linux-* .
+      - uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
