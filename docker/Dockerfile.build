@@ -1,74 +1,26 @@
 # =============================================================================
 # Icecast Build Environment
 # =============================================================================
+FROM alpine:latest
 
-FROM alpine:3.21
-
-ARG BOOTLIN_VERSION=2024.02-1
-ARG LIBMAXMINDDB_VERSION=1.11.0
-
-# Install build essentials + native static libs
+# Install ALL build tools and static libraries
 RUN apk add --no-cache \
     build-base curl wget git autoconf automake libtool pkgconf \
-    linux-headers tar xz bzip2 ca-certificates perl \
-    gcompat \
-    # Native static libraries
+    linux-headers tar xz bzip2 ca-certificates perl python3 \
+    # Static libraries (native amd64)
     zlib-static openssl-libs-static libxml2-static libxslt-static \
-    libogg-static libvorbis-static libtheora-static curl-static \
-    nghttp2-static brotli-static c-ares-static libidn2-static
+    libogg-static libvorbis-static libtheora-static curl-static libmaxminddb-static \
+    nghttp2-static brotli-static libidn2-static \
+    # Dev headers
+    zlib-dev openssl-dev libxml2-dev libxslt-dev \
+    libogg-dev libvorbis-dev libtheora-dev curl-dev libmaxminddb-dev
 
-ENV PREFIX=/opt/deps
-ENV BOOTLIN_DIR=/opt/cross/aarch64-linux-musl
-
-RUN mkdir -p ${PREFIX}/amd64 ${PREFIX}/arm64 /build
+# Build libigloo (not in Alpine)
+RUN git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git && cd icecast-libigloo && \
+    autoreconf -fi && ./configure --prefix=/usr --disable-shared --enable-static && \
+    make -j$(nproc) && make install && cd .. && rm -rf icecast-libigloo
 
 WORKDIR /build
-
-# Install Bootlin cross-compiler
-RUN wget -q "https://toolchains.bootlin.com/downloads/releases/toolchains/aarch64/tarballs/aarch64--musl--stable-${BOOTLIN_VERSION}.tar.bz2" && \
-    tar xjf *.tar.bz2 -C /opt && mv /opt/aarch64--musl--stable-* ${BOOTLIN_DIR} && rm -f *.tar.bz2 && \
-    cd ${BOOTLIN_DIR}/bin && \
-    for tool in gcc g++; do rm -f aarch64-linux-$tool && \
-        printf '#!/bin/sh\nexec %s/bin/aarch64-buildroot-linux-musl-'$tool'.br_real "$@"\n' ${BOOTLIN_DIR} > aarch64-linux-$tool && \
-        chmod +x aarch64-linux-$tool; done && \
-    for tool in ar strip ranlib; do rm -f aarch64-linux-$tool && ln -sf aarch64-buildroot-linux-musl-$tool aarch64-linux-$tool; done
-
-ENV PATH="${BOOTLIN_DIR}/bin:${PATH}"
-
-# Build librhash (AMD64)
-RUN git clone --depth 1 https://github.com/rhash/RHash.git && cd RHash && \
-    ./configure --prefix=${PREFIX}/amd64 --enable-static && \
-    make -j$(nproc) lib-static && make install-lib-static install-lib-headers && \
-    cd .. && rm -rf RHash
-
-# Build libmaxminddb (AMD64)
-RUN wget -q "https://github.com/maxmind/libmaxminddb/releases/download/${LIBMAXMINDDB_VERSION}/libmaxminddb-${LIBMAXMINDDB_VERSION}.tar.gz" && \
-    tar xzf *.tar.gz && cd libmaxminddb-*/ && \
-    ./configure --prefix=${PREFIX}/amd64 --disable-shared --enable-static && \
-    make -j$(nproc) && make install && cd .. && rm -rf libmaxminddb-*
-
-# Build libigloo (AMD64)
-RUN git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git && cd icecast-libigloo && \
-    autoreconf -fi && ./configure --prefix=${PREFIX}/amd64 --disable-shared --enable-static && \
-    make -j$(nproc) && make install && cd .. && rm -rf icecast-libigloo
-
-# Build deps for ARM64
-RUN git clone --depth 1 https://github.com/rhash/RHash.git && cd RHash && \
-    ./configure --prefix=${PREFIX}/arm64 --enable-static --cc=aarch64-linux-gcc && \
-    make -j$(nproc) lib-static CC=aarch64-linux-gcc AR=aarch64-linux-ar && \
-    make install-lib-static install-lib-headers && cd .. && rm -rf RHash
-
-RUN wget -q "https://github.com/maxmind/libmaxminddb/releases/download/${LIBMAXMINDDB_VERSION}/libmaxminddb-${LIBMAXMINDDB_VERSION}.tar.gz" && \
-    tar xzf *.tar.gz && cd libmaxminddb-*/ && \
-    ./configure --prefix=${PREFIX}/arm64 --host=aarch64-linux-musl --disable-shared --enable-static && \
-    make -j$(nproc) && make install && cd .. && rm -rf libmaxminddb-*
-
-RUN git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git && cd icecast-libigloo && \
-    autoreconf -fi && ./configure --prefix=${PREFIX}/arm64 --host=aarch64-linux-musl --disable-shared --enable-static && \
-    make -j$(nproc) && make install && cd .. && rm -rf icecast-libigloo
-
-# Cleanup
-RUN rm -rf /build/*
 
 # Build script
 COPY <<'EOF' /usr/local/bin/build-icecast
@@ -76,16 +28,19 @@ COPY <<'EOF' /usr/local/bin/build-icecast
 set -e
 ARCH="${1:-amd64}"
 case "$ARCH" in
-    amd64) PREFIX=/opt/deps/amd64; CC=gcc; STRIP=strip; HOST="" ;;
-    arm64) PREFIX=/opt/deps/arm64; CC=aarch64-linux-gcc; STRIP=aarch64-linux-strip; HOST="--host=aarch64-linux-musl" ;;
-    *) echo "Unknown: $ARCH"; exit 1 ;;
+    amd64)
+        CC=gcc; STRIP=strip; HOST=""
+        PKG_CONFIG_PATH="/usr/lib/pkgconfig"
+        PREFIX="/usr"
+        ;;
+    *) echo "Only amd64 supported for now"; exit 1 ;;
 esac
 
 cd /build
 git clone --recursive https://github.com/xiph/Icecast-Server.git && cd Icecast-Server
 VERSION=$(sed -n 's/^AC_INIT(\[Icecast\], \[\([0-9.]*\)\].*/\1/p' configure.ac || echo "2.5.0")
 
-export CC PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig:/usr/lib/pkgconfig"
+export CC PKG_CONFIG_PATH
 autoreconf -fi
 CFLAGS="-Os -I${PREFIX}/include" LDFLAGS="-L${PREFIX}/lib" ./configure ${HOST} \
     --prefix=/usr --enable-yp --enable-ipv6 --without-speex --with-libmaxminddb="${PREFIX}"
@@ -100,4 +55,4 @@ EOF
 
 RUN chmod +x /usr/local/bin/build-icecast
 WORKDIR /workspace
-CMD ["echo", "Usage: build-icecast [amd64|arm64]"]
+CMD ["echo", "Usage: build-icecast [amd64]"]
