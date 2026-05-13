@@ -35,7 +35,7 @@ All optional features are compiled in:
 
 ### Static Binaries
 
-Built with [musl libc](https://musl.libc.org/) on Alpine Linux:
+Built as fully static Linux binaries on Alpine Linux:
 
 **Static (built-in)**:
 - All codec libraries (Vorbis, Theora, Speex)
@@ -55,10 +55,9 @@ Each release includes binaries for:
 
 | Platform | Architectures | Notes |
 |----------|---------------|-------|
-| **Linux** | x86_64, aarch64 | Fully static (musl libc) |
+| **Linux** | amd64, arm64 | Fully static |
 
 Plus:
-- **Source archive** (`icecast-X.X.X-src.tar.gz`) - No VCS files
 - **SHA256SUMS.txt** - Checksums for verification
 
 ## Quick Start
@@ -67,13 +66,13 @@ Plus:
 
 ```bash
 # Download the appropriate binary for your architecture
-wget https://github.com/YOUR-USERNAME/icecast/releases/latest/download/icecast-linux-x86_64
+wget https://github.com/YOUR-USERNAME/icecast/releases/latest/download/icecast-linux-amd64
 
 # Make it executable
-chmod +x icecast-linux-x86_64
+chmod +x icecast-linux-amd64
 
 # Rename for convenience (optional)
-mv icecast-linux-x86_64 icecast
+mv icecast-linux-amd64 icecast
 
 # Run (needs config file)
 ./icecast -c /path/to/icecast.xml
@@ -152,36 +151,39 @@ Options:
 
 ## Build System
 
-This repository contains only the GitHub Actions workflow for automated builds. All build logic is inline in [.github/workflows/build.yml](.github/workflows/build.yml).
+This repository contains two GitHub Actions workflows: [.github/workflows/build-env-image.yml](.github/workflows/build-env-image.yml) maintains the reusable Linux build image, and [.github/workflows/build-linux-binaries.yml](.github/workflows/build-linux-binaries.yml) builds and releases the static Linux binaries.
+
+The Linux builds run inside the reusable `ghcr.io/binmgr/icecast:build` image, which is produced from [docker/Dockerfile.build](docker/Dockerfile.build).
 
 ### How It Works
 
-1. **Triggers**: Builds run on push to main/master, monthly on the 1st at 00:00 UTC, or manually
-2. **Platform**: Uses [binmgr/toolchain](https://github.com/binmgr/toolchain) Docker image (Alpine/musl)
-3. **Dependencies**: Pre-installed in toolchain + librhash, libmaxminddb, and libigloo built from source
-4. **Icecast**: Built with all features enabled
-5. **Release**: Automatic GitHub release with version from upstream
+1. **Triggers**: The build environment image refreshes on push, quarterly schedule, or manual dispatch; binary releases run on workflow dispatch, direct workflow changes, or after the environment image finishes successfully
+2. **Build image**: Uses a reusable Alpine-based build container published as `ghcr.io/binmgr/icecast:build`
+3. **Dependencies**: Alpine static packages are reused where possible; Speex, librhash, and libigloo are built from source for a fully static link
+4. **Architectures**: GitHub Actions runs the build container as `linux/amd64` and `linux/arm64`, so each binary is built natively for its target architecture
+5. **Release**: Automatic GitHub release with versioned binaries, checksums, and multi-arch container tags
 
 ### What Gets Built
 
-**From [binmgr/toolchain](https://github.com/binmgr/toolchain) (pre-installed):**
-- zlib, libogg, libvorbis, libtheora, libspeex (codecs)
+**From Alpine packages:**
+- zlib, libogg, libvorbis, libtheora (core codecs)
 - OpenSSL (TLS/SSL)
-- libcurl (HTTP client)
+- libcurl and its static link dependencies (HTTP client / YP)
 - libxml2, libxslt (XML/XSLT)
+- libmaxminddb (GeoIP lookups)
 - All standard build tools and compilers
 
 **Built from source:**
+- speex (static library)
 - librhash (hash functions)
-- libmaxminddb (GeoIP lookups)
 - libigloo (Icecast common framework)
 - Icecast (with all features enabled)
 
 ### Build Times
 
 Approximate build times per platform:
-- **Linux x86_64**: ~5-10 minutes (native)
-- **Linux aarch64**: ~5-10 minutes (cross-compile)
+- **Linux amd64**: ~5-10 minutes
+- **Linux arm64**: ~8-15 minutes
 
 ## Platform Compatibility
 
@@ -255,38 +257,32 @@ For issues with:
 
 ## Local Testing with Docker
 
-Test builds locally using the [binmgr/toolchain](https://github.com/binmgr/toolchain) Docker image.
+Test builds locally using the repository's reusable build image.
 
 ### Quick Start
 
-**Pull the toolchain:**
+**Build the reusable environment image:**
 ```bash
-docker pull ghcr.io/binmgr/toolchain:latest
+docker build -f docker/Dockerfile.build -t icecast-build .
 ```
 
-**Build Icecast (Linux x86_64):**
+**Build Icecast (Linux amd64):**
 ```bash
-docker run --rm -v $(pwd):/workspace ghcr.io/binmgr/toolchain:latest sh -c '
-  # Run the build script (simplified example)
-  cd /workspace
-  # ... build commands from workflow ...
-'
+mkdir -p output
+docker run --rm --platform=linux/amd64 -v "$(pwd)/output:/output" icecast-build build-icecast amd64
 ```
 
-**Build for Linux ARM64 (cross-compile):**
+**Build Icecast (Linux arm64):**
 ```bash
-docker run --rm -v $(pwd):/workspace ghcr.io/binmgr/toolchain:latest sh -c '
-  export CC=aarch64-linux-gcc
-  export CXX=aarch64-linux-g++
-  # ... build commands ...
-'
+mkdir -p output
+docker run --rm --platform=linux/arm64 -v "$(pwd)/output:/output" icecast-build build-icecast arm64
 ```
 
 ### Expected Build Times
 
 | Build | Time | Notes |
 |-------|------|-------|
-| Linux x86_64 | ~5-10 min | Native build in container |
-| Linux aarch64 | ~5-10 min | Cross-compile with pre-built toolchain |
+| Linux amd64 | ~5-10 min | Native build inside the reusable container |
+| Linux arm64 | ~8-15 min | Native arm64 container build, typically via QEMU on x86 runners |
 
-The toolchain image dramatically reduces build times by providing all standard dependencies pre-installed.
+The reusable build image keeps release builds consistent and ensures both architectures are produced from the same dependency set.

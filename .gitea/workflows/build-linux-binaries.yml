@@ -1,0 +1,76 @@
+name: Build Linux Binaries
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - '.gitea/workflows/build-linux-binaries.yml'
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    env:
+      SERVER_URL: ${{ gitea.server_url || github.server_url }}
+      REPOSITORY: ${{ gitea.repository || github.repository }}
+      GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install release dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - uses: docker/setup-qemu-action@v3
+        with:
+          platforms: amd64,arm64
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build amd64 binary
+        run: |
+          mkdir -p artifacts
+          docker buildx build --platform linux/amd64 --load -t local/icecast:build-amd64 -f docker/Dockerfile.build .
+          docker run --rm --platform linux/amd64 -v "$PWD/artifacts:/output" local/icecast:build-amd64 build-icecast amd64
+
+      - name: Build arm64 binary
+        run: |
+          docker buildx build --platform linux/arm64 --load -t local/icecast:build-arm64 -f docker/Dockerfile.build .
+          docker run --rm --platform linux/arm64 -v "$PWD/artifacts:/output" local/icecast:build-arm64 build-icecast arm64
+
+      - name: Get version
+        id: ver
+        run: echo "version=$(cat artifacts/VERSION 2>/dev/null || echo '2.5.0')" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare release
+        run: |
+          mkdir -p release
+          cp artifacts/icecast-* release/
+          chmod +x release/icecast-linux-*
+          cd release
+          sha256sum icecast-linux-* > SHA256SUMS.txt
+
+      - name: Create release
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          curl -sf -X DELETE -H "Authorization: token ${GITEA_TOKEN}" \
+            "${SERVER_URL}/api/v1/repos/${REPOSITORY}/releases/tags/${TAG}" || true
+
+          RELEASE_ID=$(curl -sf -X POST -H "Authorization: token ${GITEA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "${SERVER_URL}/api/v1/repos/${REPOSITORY}/releases" \
+            -d "{\"tag_name\":\"${TAG}\",\"name\":\"Icecast ${VERSION}\",\"body\":\"Static Icecast binaries\"}" \
+            | jq -r '.id')
+
+          for file in release/*; do
+            [ -f "$file" ] || continue
+            name="$(basename "$file")"
+            curl -sf -X POST -H "Authorization: token ${GITEA_TOKEN}" \
+              -F "attachment=@${file}" \
+              "${SERVER_URL}/api/v1/repos/${REPOSITORY}/releases/${RELEASE_ID}/assets?name=${name}"
+          done

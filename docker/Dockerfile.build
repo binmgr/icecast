@@ -2,50 +2,117 @@
 # Icecast Build Environment
 # =============================================================================
 FROM alpine:latest
+ARG TARGETARCH
 
-# Install ALL build tools and static libraries
+# Install build tools and the static-friendly Alpine packages we can reuse.
 RUN apk add --no-cache \
-    build-base curl wget git autoconf automake libtool pkgconf \
-    linux-headers tar xz bzip2 ca-certificates perl python3 \
-    # Static libraries (native amd64)
-    zlib-static openssl-libs-static libxml2-static libxslt-static \
-    libogg-static libvorbis-static libtheora-static curl-static libmaxminddb-static \
-    nghttp2-static brotli-static libidn2-static \
-    # Dev headers
-    zlib-dev openssl-dev libxml2-dev libxslt-dev \
-    libogg-dev libvorbis-dev libtheora-dev curl-dev libmaxminddb-dev
+    autoconf automake build-base brotli-static bzip2 ca-certificates c-ares-dev \
+    curl curl-dev curl-static file git libidn2-static libmaxminddb-dev \
+    libmaxminddb-static libogg-dev libogg-static libpsl-static libtheora-dev \
+    libtheora-static libtool libunistring-static libvorbis-dev libvorbis-static \
+    libxml2-dev libxml2-static libxslt-dev libxslt-static linux-headers \
+    nghttp2-static nghttp3-static openssl-dev openssl-libs-static pkgconf \
+    python3 tar wget xz xz-dev xz-static zlib-dev zlib-static zstd-static
 
-# Build libigloo (not in Alpine)
-RUN git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git && cd icecast-libigloo && \
-    autoreconf -fi && ./configure --prefix=/usr --disable-shared --enable-static && \
-    make -j$(nproc) && make install && cd .. && rm -rf icecast-libigloo
+# Build static-only dependencies that Alpine either does not package or does not
+# package in a form that works for a fully static scratch-compatible target.
+RUN wget -qO /tmp/speex.tar.gz https://downloads.xiph.org/releases/speex/speex-1.2.1.tar.gz && \
+    build_jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)" && \
+    [ "${TARGETARCH}" = "arm64" ] && build_jobs=1 || true && \
+    tar xzf /tmp/speex.tar.gz -C /tmp && cd /tmp/speex-1.2.1 && \
+    ./configure --prefix=/usr --disable-shared --enable-static && \
+    make -j"${build_jobs}" && make install && \
+    rm -rf /tmp/speex-1.2.1 /tmp/speex.tar.gz
+
+RUN wget -qO /tmp/rhash.tar.gz https://github.com/rhash/RHash/archive/refs/tags/v1.4.6.tar.gz && \
+    build_jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)" && \
+    [ "${TARGETARCH}" = "arm64" ] && build_jobs=1 || true && \
+    tar xzf /tmp/rhash.tar.gz -C /tmp && cd /tmp/RHash-1.4.6 && \
+    set -- --prefix=/usr --enable-lib-static; \
+    [ "${TARGETARCH}" = "arm64" ] && set -- "$@" --extra-cflags=-O0 || true; \
+    ./configure "$@" && \
+    make -j"${build_jobs}" lib-static && \
+    make install-lib-static install-lib-headers && \
+    install -Dm644 dist/librhash.pc /usr/lib/pkgconfig/librhash.pc && \
+    rm -rf /tmp/RHash-1.4.6 /tmp/rhash.tar.gz
+
+RUN git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git /tmp/icecast-libigloo && \
+    build_jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)" && \
+    [ "${TARGETARCH}" = "arm64" ] && build_jobs=1 || true && \
+    cd /tmp/icecast-libigloo && \
+    autoreconf -fi && \
+    ./configure --prefix=/usr --disable-shared --enable-static && \
+    make -j"${build_jobs}" && make install && \
+    rm -rf /tmp/icecast-libigloo
 
 WORKDIR /build
 
 # Build script
 COPY <<'EOF' /usr/local/bin/build-icecast
 #!/bin/sh
-set -e
-ARCH="${1:-amd64}"
-case "$ARCH" in
-    amd64)
-        CC=gcc; STRIP=strip; HOST=""
-        PKG_CONFIG_PATH="/usr/lib/pkgconfig"
-        PREFIX="/usr"
+set -eu
+
+ARCH="${1:-}"
+
+if [ -z "${ARCH}" ]; then
+    case "$(uname -m)" in
+        x86_64) ARCH=amd64 ;;
+        aarch64) ARCH=arm64 ;;
+        *) echo "Unsupported machine: $(uname -m)" >&2; exit 1 ;;
+    esac
+fi
+
+case "$(uname -m):${ARCH}" in
+    x86_64:amd64|aarch64:arm64)
         ;;
-    *) echo "Only amd64 supported for now"; exit 1 ;;
+    x86_64:arm64|aarch64:amd64)
+        echo "Requested ${ARCH}, but the container is running on $(uname -m). Use --platform=linux/${ARCH}." >&2
+        exit 1
+        ;;
+    *)
+        echo "Unsupported architecture request: ${ARCH}" >&2
+        exit 1
+        ;;
 esac
 
+if [ -n "${JOBS:-}" ]; then
+    build_jobs="${JOBS}"
+else
+    build_jobs="$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)"
+    if [ "${ARCH}" = "arm64" ]; then
+        build_jobs=1
+    fi
+fi
+
+echo "Building Icecast for ${ARCH}..."
 cd /build
-git clone --recursive https://github.com/xiph/Icecast-Server.git && cd Icecast-Server
+rm -rf Icecast-Server
+git clone --depth 1 --recursive https://github.com/xiph/Icecast-Server.git Icecast-Server
+cd Icecast-Server
 VERSION=$(sed -n 's/^AC_INIT(\[Icecast\], \[\([0-9.]*\)\].*/\1/p' configure.ac || echo "2.5.0")
 
-export CC PKG_CONFIG_PATH
 autoreconf -fi
-CFLAGS="-Os -I${PREFIX}/include" LDFLAGS="-L${PREFIX}/lib" ./configure ${HOST} \
-    --prefix=/usr --enable-yp --enable-ipv6 --without-speex --with-libmaxminddb="${PREFIX}"
-make -j$(nproc) AM_CFLAGS="-static" AM_LDFLAGS="-static -all-static"
-${STRIP} src/icecast
+
+PKG_CONFIG="pkg-config --static" \
+PKG_CONFIG_PATH="/usr/lib/pkgconfig:/usr/share/pkgconfig" \
+CFLAGS="-Os -fno-pie" \
+LDFLAGS="-L/usr/lib -no-pie" \
+./configure \
+    --prefix=/usr \
+    --disable-shared \
+    --enable-static \
+    --enable-yp \
+    --enable-ipv6 \
+    --with-ogg \
+    --with-theora \
+    --with-speex \
+    --with-curl \
+    --with-openssl \
+    --with-maxminddb
+
+make -j"${build_jobs}" AM_CFLAGS="-fno-pie" AM_LDFLAGS="-all-static -static -no-pie -L/usr/lib"
+strip src/icecast
+file src/icecast | grep -Eq 'statically linked|static-pie linked'
 
 mkdir -p /output
 cp src/icecast /output/icecast-linux-${ARCH}
@@ -55,4 +122,4 @@ EOF
 
 RUN chmod +x /usr/local/bin/build-icecast
 WORKDIR /workspace
-CMD ["echo", "Usage: build-icecast [amd64]"]
+CMD ["echo", "Usage: build-icecast [amd64|arm64]"]
