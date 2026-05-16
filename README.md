@@ -66,7 +66,7 @@ Plus:
 
 ```bash
 # Download the appropriate binary for your architecture
-wget https://github.com/YOUR-USERNAME/icecast/releases/latest/download/icecast-linux-amd64
+wget https://github.com/binmgr/icecast/releases/latest/download/icecast-linux-amd64
 
 # Make it executable
 chmod +x icecast-linux-amd64
@@ -82,7 +82,7 @@ mv icecast-linux-amd64 icecast
 
 ```bash
 # Download checksums
-wget https://github.com/YOUR-USERNAME/icecast/releases/latest/download/SHA256SUMS.txt
+wget https://github.com/binmgr/icecast/releases/latest/download/SHA256SUMS.txt
 
 # Verify
 sha256sum -c SHA256SUMS.txt --ignore-missing

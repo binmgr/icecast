@@ -1,0 +1,19 @@
+# CODEOWNERS — reviewers are auto-requested for matching paths on pull requests
+
+# Default owner for everything
+* @casjaysdev
+
+# CI/CD pipelines and release automation
+.github/workflows/ @casjaysdev
+.gitea/workflows/  @casjaysdev
+
+# Build and runtime Dockerfiles
+docker/Dockerfile.build   @casjaysdev
+docker/Dockerfile.runtime @casjaysdev
+
+# Entrypoint (generates config from env vars — security-sensitive)
+docker/rootfs/ @casjaysdev
+
+# Security policy
+.github/SECURITY.md @casjaysdev
+.github/CODEOWNERS  @casjaysdev
