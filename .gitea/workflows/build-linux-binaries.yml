@@ -1,10 +1,6 @@
 name: Build Linux Binaries
 
 on:
-  push:
-    branches: [main, master]
-    paths:
-      - '.gitea/workflows/build-linux-binaries.yml'
   schedule:
     - cron: '0 0 1 * *'
   workflow_dispatch:
@@ -17,18 +13,18 @@ jobs:
       REPOSITORY: ${{ gitea.repository || github.repository }}
       GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Install release dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
 
-      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3
         with:
           platforms: amd64,arm64
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
 
       - name: Build amd64 binary
         run: |
