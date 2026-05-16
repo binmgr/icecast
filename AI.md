@@ -186,7 +186,9 @@ The CMD is documentation only — callers always pass `build-icecast` explicitly
   7. Create release `v<VERSION>` with title `Icecast <VERSION>` and upload all files
   8. `docker/setup-buildx-action` + `docker/login-action`
   9. Copy binaries to context root, then `docker/build-push-action`:
+     - context `.`, file `docker/Dockerfile.runtime`
      - platforms `linux/amd64,linux/arm64`
+     - build-args: `VERSION=<ver>`, `BUILD_DATE=<date>`, `VCS_REF=<sha>`
      - tags: `latest`, `<VERSION>`, `<YYMM>`
 
 ### SHA pinning requirement
@@ -247,8 +249,11 @@ uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4
 ### Files
 
 - `docker/Dockerfile.build` is the build-environment image definition.
-- `docker/Dockerfile.runtime` is the minimal `FROM scratch` runtime image that embeds
-  the static binary. No Dockerfile lives at the repo root.
+- `docker/Dockerfile.runtime` is the two-stage runtime image: stage `assets` clones
+  upstream for web/admin files; stage 2 is Alpine + tini + binary + entrypoint.
+- `docker/rootfs/usr/local/bin/entrypoint.sh` generates `/etc/icecast/icecast.xml` from
+  env vars then `exec`s icecast.
+- No Dockerfile lives at the repo root.
 - All workflow files live in `.github/workflows/` and `.gitea/workflows/`.
   No other workflow or CI config belongs at the repo root.
 
@@ -285,7 +290,36 @@ Add them to `.gitignore` if they appear locally.
 
 ---
 
-## PART 7 — Compliance schedule
+## PART 7 — Runtime environment variables
+
+All variables are optional; defaults are shown. `entrypoint.sh` generates
+`/etc/icecast/icecast.xml` from these at container start.
+
+| Variable | Default | Maps to `icecast.xml` |
+|----------|---------|----------------------|
+| `ICECAST_HOSTNAME` | `localhost` | `<hostname>` |
+| `ICECAST_LOCATION` | `Earth` | `<location>` |
+| `ICECAST_ADMIN_EMAIL` | `{admin_user}@{hostname}` | `<admin>` |
+| `ICECAST_ADMIN_USERNAME` | `admin` | `<authentication><admin-user>` |
+| `ICECAST_ADMIN_PASSWORD` | `changeme` | `<authentication><admin-password>` |
+| `ICECAST_SOURCE_PASSWORD` | `$STREAM_PASSWORD` or `changeme` | `<authentication><source-password>` |
+| `ICECAST_RELAY_PASSWORD` | `$STREAM_PASSWORD` or `changeme` | `<authentication><relay-password>` |
+| `ICECAST_MAX_CLIENTS` | `100` | `<limits><clients>` |
+| `ICECAST_MAX_SOURCES` | `2` | `<limits><sources>` |
+| `STREAM_PORT` | `8000` | `<listen-socket><port>` |
+| `STREAM_PASSWORD` | *(none)* | Legacy fallback for `SOURCE_` and `RELAY_` passwords |
+| `TZ` | *(system)* | Container timezone via tzdata |
+
+Values are XML-escaped at generation time (`&`, `<`, `>`, `"` → entities).
+
+Logs go to stdout (`-`) and are captured by Docker's json-file driver.
+
+The container runs as a non-root `icecast:icecast` user. Port 8000 does not
+require elevated privileges.
+
+---
+
+## PART 8 — Compliance schedule
 
 | When | Action |
 |------|--------|

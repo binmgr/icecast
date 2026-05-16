@@ -1,5 +1,59 @@
-FROM scratch
+# =============================================================================
+# Stage 1 — fetch upstream web/admin interface files (arch-independent)
+# =============================================================================
+FROM alpine:latest AS assets
+
+RUN apk add --no-cache git
+RUN git clone --depth 1 https://github.com/xiph/Icecast-Server.git /src
+
+# =============================================================================
+# Stage 2 — runtime image
+# =============================================================================
+FROM alpine:latest
+
 ARG TARGETARCH
+ARG VERSION=dev
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Static labels
+LABEL maintainer="binmgr <binmgr@casjay.pro>" \
+      org.opencontainers.image.vendor="binmgr" \
+      org.opencontainers.image.authors="binmgr" \
+      org.opencontainers.image.title="icecast" \
+      org.opencontainers.image.base.name="icecast" \
+      org.opencontainers.image.description="Containerized version of icecast" \
+      org.opencontainers.image.url="https://github.com/binmgr/icecast" \
+      org.opencontainers.image.source="https://github.com/binmgr/icecast" \
+      org.opencontainers.image.documentation="https://github.com/binmgr/icecast" \
+      org.opencontainers.image.vcs-type="Git" \
+      com.github.containers.toolbox="false"
+
+# Dynamic labels (from ARGs)
+LABEL org.opencontainers.image.licenses="GPL-2.0" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.schema-version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}"
+
+RUN apk add --no-cache bash tini tzdata
+
 COPY icecast-linux-${TARGETARCH} /usr/local/bin/icecast
-ENTRYPOINT ["/usr/local/bin/icecast"]
-CMD ["-v"]
+COPY --from=assets /src/web/   /usr/share/icecast/web/
+COPY --from=assets /src/admin/ /usr/share/icecast/admin/
+COPY docker/rootfs/ /
+COPY docker/Dockerfile.runtime /root/Dockerfile
+
+RUN addgroup -S icecast && adduser -S icecast -G icecast \
+ && mkdir -p /etc/icecast /run/icecast /var/log/icecast \
+ && chown -R icecast:icecast /etc/icecast /run/icecast /var/log/icecast \
+ && chmod 755 /usr/local/bin/icecast /usr/local/bin/entrypoint.sh
+
+USER icecast
+
+EXPOSE 8000
+
+HEALTHCHECK --start-period=2m --interval=30s --timeout=10s --retries=3 \
+    CMD bash -c "printf '' > /dev/tcp/127.0.0.1/${STREAM_PORT:-8000}" || exit 1
+
+ENTRYPOINT [ "/sbin/tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh" ]

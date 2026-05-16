@@ -1,0 +1,36 @@
+# .dockerignore created on 05/15/26 at 00:00
+
+# version control
+.git/
+.gitignore
+.gitattributes
+.gitea/
+.github/
+
+# local and secret config
+.env
+app.env
+default.env
+.claude/
+
+# build artifacts
+binaries/
+artifacts/
+release/
+
+# runtime volume data (never in image)
+volumes/
+docker/volumes/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# docs and meta (not needed in image)
+*.md
+LICENSE*
+
+# spec files
+AI.md
+IDEA.md
+CLAUDE.md
