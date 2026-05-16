@@ -13,18 +13,18 @@ jobs:
       REPOSITORY: ${{ gitea.repository || github.repository }}
       GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
 
       - name: Install release dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y jq
 
-      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130  # v3
+      - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a  # v4.0.0
         with:
           platforms: amd64,arm64
 
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f  # v3
+      - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
 
       - name: Build amd64 binary
         run: |
@@ -60,7 +60,7 @@ jobs:
           RELEASE_ID=$(curl -sf -X POST -H "Authorization: token ${GITEA_TOKEN}" \
             -H "Content-Type: application/json" \
             "${SERVER_URL}/api/v1/repos/${REPOSITORY}/releases" \
-            -d "{\"tag_name\":\"${TAG}\",\"name\":\"Icecast ${VERSION}\",\"body\":\"Static Icecast binaries\"}" \
+            -d "{\"tag_name\":\"${TAG}\",\"name\":\"Icecast ${VERSION}\",\"body\":\"Static Icecast binaries for Linux amd64 and arm64\"}" \
             | jq -r '.id')
 
           for file in release/*; do

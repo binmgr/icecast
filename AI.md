@@ -238,10 +238,10 @@ Docker's json-file driver. Never source credentials — read env vars only.
   2. `docker/login-action` (read pull)
   3. `docker run --rm --platform=linux/<arch> -v "${RUNNER_TEMP}/icecast-output:/output"
      {registry}/{image}:build build-icecast <arch>`
-  4. `actions/upload-artifact` — name `icecast-linux-<arch>`, paths binary + `VERSION`
+  4. `actions/upload-artifact` — name `icecast-linux-<arch>`, paths binary + `VERSION`, `retention-days: 30`
 
 **Job: `release`** (needs: build)
-- Runner: `ubuntu-latest` · Permissions: `contents: write`, `packages: write`
+- Runner: `ubuntu-latest` · Permissions: `contents: write`, `packages: write`, `id-token: write`, `attestations: write`
 - Steps:
   1. `actions/checkout`
   2. `actions/download-artifact` — merge all into `artifacts/`
@@ -257,20 +257,39 @@ Docker's json-file driver. Never source credentials — read env vars only.
       build-args: `VERSION`, `BUILD_DATE`, `VCS_REF`,
       tags: `latest`, `<VERSION>`, `<YYMM>`
 
+### Workflow-level defaults
+
+Both workflows set `permissions: contents: read` at the top level (read-only baseline)
+and define a `concurrency` group to cancel stale runs. The release job in
+`build-linux-binaries.yml` uses `cancel-in-progress: false` to prevent partial publishes.
+
+### Security workflows
+
+`security.yml` runs on push, pull_request, and weekly schedule:
+- **Secret scanning** — `trufflesecurity/trufflehog` (Apache-2.0, no license key)
+- **Container scan** — Trivy against `ghcr.io/binmgr/icecast:latest`; critical/high CVE = failure
+
+### Dependabot
+
+`.github/dependabot.yml` automates weekly updates for:
+- `github-actions` ecosystem (all workflow `uses:` references)
+- `docker` ecosystem (base images in `docker/`)
+
 ### SHA pinning requirement
 
 All `uses:` references **must** be pinned to a full commit SHA — tags forbidden.
-Current pins (update whenever actions are upgraded):
+Current pins (update whenever actions are upgraded; all are node24 runtimes):
 
 | Action | SHA | Tag |
 |--------|-----|-----|
-| `actions/checkout` | `34e114876b0b11c390a56381ad16ebd13914f8d5` | v4 |
-| `actions/upload-artifact` | `ea165f8d65b6e75b540449e92b4886f43607fa02` | v4 |
-| `actions/download-artifact` | `d3f86a106a0bac45b974a628896c90dbdf5c8093` | v4 |
-| `docker/setup-qemu-action` | `c7c53464625b32c7a7e944ae62b3e17d2b600130` | v3 |
-| `docker/setup-buildx-action` | `8d2750c68a42422c14e847fe6c8ac0403b4cbd6f` | v3 |
-| `docker/login-action` | `c94ce9fb468520275223c153574b00df6fe4bcc9` | v3 |
-| `docker/build-push-action` | `ca052bb54ab0790a636c9b5f226502c73d547a25` | v5 |
+| `actions/checkout` | `de0fac2e4500dabe0009e67214ff5f5447ce83dd` | v6.0.2 |
+| `actions/upload-artifact` | `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` | v7.0.1 |
+| `actions/download-artifact` | `3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c` | v8.0.1 |
+| `docker/setup-qemu-action` | `ce360397dd3f832beb865e1373c09c0e9f86d70a` | v4.0.0 |
+| `docker/setup-buildx-action` | `4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd` | v4.0.0 |
+| `docker/login-action` | `4907a6ddec9925e35a0a9e82d7399ccc52663121` | v4.1.0 |
+| `docker/build-push-action` | `bcafcacb16a39f128d818304e6c9c0c18556b85f` | v7.1.0 |
+| `trufflesecurity/trufflehog` | `37b77001d0174ebec2fcca2bd83ff83a6d45a3ab` | v3.95.3 |
 
 ---
 

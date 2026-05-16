@@ -1,5 +1,35 @@
-# Claude Code local settings
-.claude/
+# gitignore created on 05/15/26 at 00:00
+ignoredirmessage
+
+# ignore commit message
+**/.gitcommit
+
+# ignore build failure markers
+**/.build_failed*
+
+# ignore backup files
+**/*.bak
+
+# ignore push/git control files
+**/.no_push
+**/.no_git
+
+# ignore install markers
+**/.installed
+
+# ignore work in progress scripts
+**/*.rewrite.sh
+**/*.refactor.sh
+
+# ignore dotenv files
+.env
+app.env
+default.env
+
+# ignore log and temp files
+*.log
+*.tmp
+*.temp
 
 # Build artifacts
 *.o
@@ -9,59 +39,37 @@
 *.dll
 *.exe
 
-# Build directories
-/build/
-/binaries/
-/dist/
-/tmp/
+# Build output
+binaries/
+artifacts/
+release/
 
-# IDE and editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
+# Runtime volume data
+volumes/
+docker/volumes/
 
-# Test files
-/test/
-/tests/output/
+# Claude Code local settings
+.claude/settings.local.json
 
-# Temporary files
-*.tmp
-*.log
-
-# Disable reminder in prompt
-ignoredirmessage
-
-# ignore .build_failed files
-**/.build_failed*
+# Other AI tool config directories
+.cursor/
+.windsurf/
+.aider/
+.ai/
 
 # OS generated files
 ### Linux ###
-
-# temporary files which can be created if a process still has a handle open of a deleted file
+*~
 .fuse_hidden*
-
-# KDE directory preferences
 .directory
-
-# Linux trash folder which might appear on any partition or disk
 .Trash-*
-
-# .nfs files are created when an open file is removed but is still being accessed
 .nfs*
 
 ### macOS ###
-# General
 .DS_Store?
 .AppleDouble
 .LSOverride
-
-# Thumbnails
 ._*
-
-# Files that might appear in the root of a volume
 .DocumentRevisions-V100
 .fseventsd
 .Spotlight-V100
@@ -69,67 +77,24 @@ ignoredirmessage
 .Trashes
 .VolumeIcon.icns
 .com.apple.timemachine.donotpresent
-
-# Directories potentially created on remote AFP share
 .AppleDB
 .AppleDesktop
 Network Trash Folder
 Temporary Items
 .apdisk
-
-### macOS Patch ###
-# iCloud generated files
 *.icloud
 
 ### Windows ###
-# Windows thumbnail cache files
 Thumbs.db
 Thumbs.db:encryptable
 ehthumbs.db
 ehthumbs_vista.db
-
-# Dump file
 *.stackdump
-
-# Folder config file
 [Dd]esktop.ini
-
-# Recycle Bin used on file shares
 $RECYCLE.BIN/
-
-# Windows Installer files
 *.cab
 *.msi
 *.msix
 *.msm
 *.msp
-
-# misc
-!*/README*
-!inc/main.bash
-
-# Windows shortcuts
 *.lnk
-
-# ignore commit message
-**/.gitcommit
-
-# ignore .build_failed files
-**/.build_failed*
-
-# ignore .bak files
-**/*.bak
-
-# ignore .no_push files
-**/.no_push
-
-# ignore .no_git files
-**/.no_git
-
-# ignore .installed files
-**/.installed
-
-# ignore work in progress files
-**/*.rewrite.sh
-**/*.refactor.sh
-
