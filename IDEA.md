@@ -91,7 +91,7 @@ At container start, `tini → entrypoint.sh → icecast`:
 | `ICECAST_LOCATION` | `Earth` | Location string in directory listings |
 | `ICECAST_ADMIN_USERNAME` | `admin` | Admin web UI username |
 | `ICECAST_ADMIN_PASSWORD` | `changeme` | Admin web UI password |
-| `ICECAST_ADMIN_EMAIL` | `{admin}@{hostname}` | Admin contact shown in listings |
+| `ICECAST_ADMIN_EMAIL` | `{admin_user}@{hostname}` | Admin contact shown in listings |
 | `ICECAST_SOURCE_PASSWORD` | `$STREAM_PASSWORD` → `changeme` | Source client auth |
 | `ICECAST_RELAY_PASSWORD` | `$STREAM_PASSWORD` → `changeme` | Relay client auth |
 | `ICECAST_MAX_CLIENTS` | `100` | Maximum simultaneous listeners |
@@ -102,27 +102,31 @@ At container start, `tini → entrypoint.sh → icecast`:
 
 ### Release flow
 
-1. Build environment image is available (quarterly rebuild or on Dockerfile.build change)
+1. Build environment image is available (quarterly rebuild or on `docker/Dockerfile.build` change)
 2. A container runs `build-icecast <arch>` natively for each target architecture
 3. Binary is stripped, verified statically linked, written to `/output/` with `VERSION`
 4. `SHA256SUMS.txt` is computed over both binaries
 5. GitHub / Gitea release created (or re-created) as `v<VERSION>` with all artifacts
-6. Runtime Docker image built via two-stage `Dockerfile.runtime` and pushed to GHCR
+6. Runtime Docker image built via two-stage `docker/Dockerfile.runtime` and pushed to GHCR
    with tags `latest`, `<VERSION>`, `<YYMM>`
 
 ### CI platforms
 
-| Platform | Binary workflow triggers | Notes |
-|----------|--------------------------|-------|
+| Platform | Triggers | Notes |
+|----------|----------|-------|
 | GitHub Actions | `workflow_run` (after env-image succeeds), monthly schedule, push to `docker/Dockerfile.runtime`, `workflow_dispatch` | Pushes images to GHCR; creates GitHub release via `gh` CLI |
 | Gitea Actions | Monthly schedule, `workflow_dispatch` | Builds images locally; creates Gitea release via API; no GHCR push |
 
-### Trust boundaries and security posture
+### Security posture
 
 - No secrets stored in source; `GITHUB_TOKEN` / `GITEA_TOKEN` injected by CI runtime
 - All upstream source fetched over HTTPS
 - All third-party GitHub Actions pinned to full commit SHA — tags forbidden
+- Automated secret scanning via truffleHog on every push and pull request
+- Automated container vulnerability scanning via Trivy; critical/high CVE = build failure
+- Dependabot automates weekly updates for GitHub Actions and Docker base images
 - Registry images tagged by version and YYMM; `latest` is always an alias, never sole tag
 - `SHA256SUMS.txt` in every release for end-user verification
 - Runtime container runs as non-root `icecast:icecast` user
 - No credentials baked into any image; all secrets injected at runtime via env vars
+- `SECURITY.md` defines private vulnerability reporting; `CODEOWNERS` gates security-sensitive paths

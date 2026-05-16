@@ -1,4 +1,4 @@
-# {project_name} — Implementation Spec (THE HOW)
+# icecast — Implementation Spec (THE HOW)
 
 > **Read-only.** Project-specific values live in `IDEA.md`. Placeholders like `{project_name}`
 > are resolved at runtime from `## Project variables` in `IDEA.md`.
@@ -26,7 +26,7 @@ even if the project is renamed.
 ## PART 1 — Repository layout
 
 ```
-{project_name}/
+icecast/
 ├── docker/
 │   ├── Dockerfile.build        # Alpine build-environment image
 │   ├── Dockerfile.runtime      # Two-stage Alpine runtime image
@@ -45,9 +45,9 @@ even if the project is renamed.
 │   └── workflows/
 │       ├── build-env-image.yml         # Gitea equivalent (local images only)
 │       └── build-linux-binaries.yml    # Gitea release via API
-├── AI.md                       # THE HOW (this file) — read-only
+├── AI.md                       # THE HOW (this file) — implementation spec
 ├── IDEA.md                     # THE WHAT — project description, variables, logic
-├── CLAUDE.md                   # Short loader pointing at AI.md and IDEA.md
+├── CLAUDE.md                   # Short loader + rules pointing at AI.md and IDEA.md
 ├── README.md                   # Public documentation
 ├── LICENSE.md                  # GPL-2.0 + third-party attributions
 ├── .dockerignore
@@ -63,17 +63,18 @@ even if the project is renamed.
 
 ### Base image
 
-```
+```dockerfile
 FROM alpine:latest
+ARG TARGETARCH
 ```
 
-Rolling tag — never pinned. The quarterly scheduled rebuild ensures the environment
-stays fresh. `TARGETARCH` is set by `docker buildx` for multi-arch builds.
+Rolling tag — never pinned. The quarterly scheduled rebuild keeps the environment
+fresh. `TARGETARCH` is set by `docker buildx` for multi-arch builds.
 
 ### Alpine packages installed
 
-All packages are installed with `--no-cache`. Static variants (`*-static`) are
-preferred wherever Alpine provides them. The full install list:
+All packages installed with `--no-cache`. Static variants (`*-static`) used wherever
+Alpine provides them. Full install list:
 
 ```
 autoconf automake build-base brotli-static bzip2 ca-certificates c-ares-dev
@@ -87,23 +88,21 @@ python3 tar wget xz xz-dev xz-static zlib-dev zlib-static zstd-static
 
 ### Source-built dependencies
 
-The following must be built from source because Alpine does not provide a static
-package that satisfies a fully static final link:
+Built from source because Alpine does not provide a static package that satisfies
+a fully static final link. **Build order is fixed** — libigloo requires librhash:
 
-| Library | Source | Configure flags |
-|---------|--------|-----------------|
-| Speex 1.2.1 | `https://downloads.xiph.org/releases/speex/speex-1.2.1.tar.gz` | `--disable-shared --enable-static` |
-| librhash 1.4.6 | `https://github.com/rhash/RHash/archive/refs/tags/v1.4.6.tar.gz` | `--enable-lib-static` |
-| libigloo | `https://gitlab.xiph.org/xiph/icecast-libigloo.git` (HEAD, depth 1) | `--disable-shared --enable-static` |
+| # | Library | Source | Configure flags |
+|---|---------|--------|-----------------|
+| 1 | Speex 1.2.1 | `https://downloads.xiph.org/releases/speex/speex-1.2.1.tar.gz` | `--disable-shared --enable-static` |
+| 2 | librhash 1.4.6 | `https://github.com/rhash/RHash/archive/refs/tags/v1.4.6.tar.gz` | `--enable-lib-static` |
+| 3 | libigloo | `https://gitlab.xiph.org/xiph/icecast-libigloo.git` (HEAD, depth 1) | `--disable-shared --enable-static` |
 
-Build order is fixed: Speex → librhash → libigloo (libigloo requires librhash).
-
-arm64 constraint: `build_jobs=1` for all source builds to avoid OOM on QEMU runners.
+arm64 constraint: `build_jobs=1` for all source builds to prevent OOM on QEMU runners.
 
 ### `build-icecast` entry point
 
 Embedded into the image via a here-doc `COPY <<'EOF'` at
-`/usr/local/bin/build-icecast` (mode 755). Callers invoke it explicitly:
+`/usr/local/bin/build-icecast` (mode 755). Callers invoke it as:
 
 ```
 docker run --rm --platform=linux/<arch> -v /output:/output <image> build-icecast <arch>
@@ -111,7 +110,7 @@ docker run --rm --platform=linux/<arch> -v /output:/output <image> build-icecast
 
 The script:
 1. Resolves `ARCH` from `$1` or `uname -m` if omitted
-2. Rejects cross-arch requests (container must match requested arch)
+2. Rejects cross-arch requests (container arch must match requested arch)
 3. Clones `https://github.com/xiph/Icecast-Server` (depth 1, recursive) into `/build`
 4. Extracts `VERSION` from `configure.ac` via `sed`
 5. Runs `autoreconf -fi` then `./configure` with all features enabled:
@@ -125,10 +124,14 @@ The script:
 8. Verifies `statically linked` or `static-pie linked` via `file`
 9. Writes `icecast-linux-<arch>` and `VERSION` to `/output/`
 
-### `WORKDIR` / `CMD`
+### Final directives
 
-`WORKDIR /workspace`. `CMD ["echo", "Usage: build-icecast [amd64|arm64]"]` is
-documentation only — callers always pass `build-icecast` explicitly.
+```dockerfile
+WORKDIR /workspace
+CMD ["echo", "Usage: build-icecast [amd64|arm64]"]
+```
+
+`CMD` is documentation only — callers always pass `build-icecast` explicitly.
 
 ---
 
@@ -148,6 +151,19 @@ RUN git clone --depth 1 https://github.com/xiph/Icecast-Server.git /src
 **Stage 2 (runtime)** — minimal Alpine with tini and the static binary:
 ```dockerfile
 FROM alpine:latest
+ARG TARGETARCH
+ARG VERSION=dev
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Static labels (names, URLs)
+LABEL maintainer="..." org.opencontainers.image.vendor="binmgr" ...
+
+# Dynamic labels (from ARGs)
+LABEL org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" ...
+
 RUN apk add --no-cache bash tini tzdata
 COPY icecast-linux-${TARGETARCH} /usr/local/bin/icecast
 COPY --from=assets /src/web/   /usr/share/icecast/web/
@@ -156,16 +172,18 @@ COPY docker/rootfs/ /
 COPY docker/Dockerfile.runtime /root/Dockerfile
 ```
 
-### User
+### User and permissions
 
-A non-root `icecast:icecast` system user is created. Runtime dirs (`/etc/icecast`,
-`/run/icecast`, `/var/log/icecast`) are owned by that user. `USER icecast` is set
-before `EXPOSE`. Port 8000 does not require elevated privileges.
+```dockerfile
+RUN addgroup -S icecast && adduser -S icecast -G icecast \
+ && mkdir -p /etc/icecast /run/icecast /var/log/icecast \
+ && chown -R icecast:icecast /etc/icecast /run/icecast /var/log/icecast \
+ && chmod 755 /usr/local/bin/icecast /usr/local/bin/entrypoint.sh
+USER icecast
+EXPOSE 8000
+```
 
-### Labels
-
-Two `LABEL` blocks — static (names, URLs) and dynamic (version, date, revision
-from `ARG VERSION`, `ARG BUILD_DATE`, `ARG VCS_REF`).
+Port 8000 does not require elevated privileges.
 
 ### Health check
 
@@ -182,25 +200,28 @@ ENTRYPOINT [ "/sbin/tini", "-p", "SIGTERM", "--", "/usr/local/bin/entrypoint.sh"
 
 `tini` is PID 1. It spawns `entrypoint.sh`, which generates
 `/etc/icecast/icecast.xml` then `exec`s `/usr/local/bin/icecast`.
+Never override or bypass tini.
 
 ---
 
 ## PART 4 — `docker/rootfs/usr/local/bin/entrypoint.sh`
 
-`#!/usr/bin/env bash` script with the CasjaysDev script header. Follows
-`tini → entrypoint.sh → icecast` chain. Ends with `exec /usr/local/bin/icecast -c
-/etc/icecast/icecast.xml`.
+`#!/usr/bin/env bash` script with CasjaysDev script header (`# shellcheck shell=bash`,
+version stamp, author block, `set -euo pipefail`).
 
-**What it does:**
+Follows `tini → entrypoint.sh → icecast` chain. Final line:
+`exec /usr/local/bin/icecast -c /etc/icecast/icecast.xml`
+
+**What it does (in order):**
 1. Applies defaults for all `ICECAST_*` / `STREAM_*` env vars (see PART 8)
 2. Creates `/etc/icecast`, `/run/icecast`, `/var/log/icecast`,
    `/usr/share/icecast/web`, `/usr/share/icecast/admin`
-3. XML-escapes every value via `__xml_escape()` (`&`, `<`, `>`, `"` → entities)
-4. Writes `/etc/icecast/icecast.xml` via here-doc
+3. XML-escapes every value via `__xml_escape()` — escapes `&`, `<`, `>`, `"`
+4. Writes `/etc/icecast/icecast.xml` via `cat > ... <<XMLEOF`
 5. `exec /usr/local/bin/icecast -c /etc/icecast/icecast.xml`
 
-Logs are directed to `-` (stdout) in the generated config and captured by
-Docker's json-file driver. Never source credentials — read env vars only.
+Logs directed to `-` (stdout) in the generated config — captured by Docker's
+json-file driver. Never source credentials from files; read env vars only.
 
 ---
 
@@ -211,41 +232,49 @@ Docker's json-file driver. Never source credentials — read env vars only.
 **Triggers:**
 - `push` to `main`/`master` touching `docker/Dockerfile.build` or the workflow file
 - Quarterly schedule: `0 0 1 */3 *`
-- Manual `workflow_dispatch`
+- `workflow_dispatch`
 
-**Job: `build`**
-- Runner: `ubuntu-latest` · Permissions: `packages: write`
-- Steps (all `uses:` SHA-pinned):
-  1. `actions/checkout`
-  2. `docker/setup-qemu-action` — platforms `amd64,arm64`
-  3. `docker/setup-buildx-action`
-  4. `docker/login-action` — registry `ghcr.io`, password `GITHUB_TOKEN`
-  5. `docker/build-push-action` — file `docker/Dockerfile.build`,
-     platforms `linux/amd64,linux/arm64`, push `true`,
-     tag `{registry}/{image}:build`,
-     cache: registry ref `{registry}/{image}:build-cache` (mode=max)
+**Permissions:** workflow-level `contents: read`; job-level `packages: write`
+
+**Concurrency:** `group: ${{ github.workflow }}-${{ github.ref }}`, `cancel-in-progress: true`
+
+**Job: `build`** steps (all `uses:` SHA-pinned):
+1. `actions/checkout`
+2. `docker/setup-qemu-action` — platforms `amd64,arm64`
+3. `docker/setup-buildx-action`
+4. `docker/login-action` — registry `ghcr.io`, password `GITHUB_TOKEN`
+5. `docker/build-push-action` — file `docker/Dockerfile.build`,
+   platforms `linux/amd64,linux/arm64`, push `true`,
+   tag `{registry}/{image}:build`,
+   cache: registry ref `{registry}/{image}:build-cache` (mode=max)
+
+---
 
 ### Workflow: `build-linux-binaries.yml`
 
 **Triggers:**
 - `push` to `main`/`master` touching `docker/Dockerfile.runtime` only
-  *(never the workflow file — that caused a race before the build image was ready)*
+  *(never the workflow file itself — that caused a race before the build image existed)*
 - Monthly schedule: `0 0 1 * *`
-- `workflow_run` on "Build Environment Image" completed with `conclusion == 'success'`
+- `workflow_run` on "Build Environment Image" `completed` with `conclusion == 'success'`
   on `main`/`master`
-- Manual `workflow_dispatch`
+- `workflow_dispatch`
 
-**Job: `build` (matrix: amd64, arm64)**
-- Runner: `ubuntu-latest` · Permissions: `packages: read` · `fail-fast: false`
+**Permissions:** workflow-level `contents: read`
+
+**Concurrency:** `group: ${{ github.workflow }}-${{ github.ref }}`, `cancel-in-progress: false`
+*(never cancel a release in flight)*
+
+**Job: `build`** (matrix: `amd64`, `arm64`; `fail-fast: false`)
+- Permissions: `packages: read`
 - Steps:
   1. `docker/setup-qemu-action`
-  2. `docker/login-action` (read pull)
-  3. `docker run --rm --platform=linux/<arch> -v "${RUNNER_TEMP}/icecast-output:/output"
-     {registry}/{image}:build build-icecast <arch>`
+  2. `docker/login-action`
+  3. `docker run --rm --platform=linux/<arch> -v "${RUNNER_TEMP}/icecast-output:/output" {registry}/{image}:build build-icecast <arch>`
   4. `actions/upload-artifact` — name `icecast-linux-<arch>`, paths binary + `VERSION`, `retention-days: 30`
 
 **Job: `release`** (needs: build)
-- Runner: `ubuntu-latest` · Permissions: `contents: write`, `packages: write`, `id-token: write`, `attestations: write`
+- Permissions: `contents: write`, `packages: write`, `id-token: write`, `attestations: write`
 - Steps:
   1. `actions/checkout`
   2. `actions/download-artifact` — merge all into `artifacts/`
@@ -258,42 +287,47 @@ Docker's json-file driver. Never source credentials — read env vars only.
   9. `cp release/icecast-linux-* .`
   10. `docker/build-push-action` — context `.`, file `docker/Dockerfile.runtime`,
       platforms `linux/amd64,linux/arm64`,
-      build-args: `VERSION`, `BUILD_DATE`, `VCS_REF`,
-      tags: `latest`, `<VERSION>`, `<YYMM>`
+      build-args `VERSION`, `BUILD_DATE`, `VCS_REF`,
+      tags `latest`, `<VERSION>`, `<YYMM>`
 
-### Workflow-level defaults
+---
 
-Both workflows set `permissions: contents: read` at the top level (read-only baseline)
-and define a `concurrency` group to cancel stale runs. The release job in
-`build-linux-binaries.yml` uses `cancel-in-progress: false` to prevent partial publishes.
+### Workflow: `security.yml`
 
-### Security workflows
+**Triggers:** `push` to `main`/`master`, `pull_request`, weekly schedule `0 3 * * 1`
 
-`security.yml` runs on push, pull_request, and weekly schedule:
-- **Secret scanning** — `trufflesecurity/trufflehog` (Apache-2.0, no license key)
-- **Container scan** — Trivy against `ghcr.io/binmgr/icecast:latest`; critical/high CVE = failure
+**Permissions:** workflow-level `contents: read`
 
-### Dependabot
+**Job: `secrets`** — `trufflesecurity/trufflehog` with `--only-verified`; no `base`/`head`
+inputs (action auto-detects range from the GitHub event).
 
-`.github/dependabot.yml` automates weekly updates for:
-- `github-actions` ecosystem (all workflow `uses:` references)
-- `docker` ecosystem (base images in `docker/`)
+**Job: `trivy`** — pulls `ghcr.io/binmgr/icecast:latest` and runs Trivy with
+`--exit-code 1 --severity CRITICAL,HIGH --ignore-unfixed`. Skips gracefully if no
+image has been published yet.
+
+---
+
+### Dependabot (`.github/dependabot.yml`)
+
+Weekly updates for `github-actions` (directory `/`) and `docker` (directory `/docker`).
+
+---
 
 ### SHA pinning requirement
 
 All `uses:` references **must** be pinned to a full commit SHA — tags forbidden.
-Current pins (update whenever actions are upgraded; all are node24 runtimes):
+Current pins (all node24 runtimes):
 
-| Action | SHA | Tag |
+| Action | Tag | SHA |
 |--------|-----|-----|
-| `actions/checkout` | `de0fac2e4500dabe0009e67214ff5f5447ce83dd` | v6.0.2 |
-| `actions/upload-artifact` | `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` | v7.0.1 |
-| `actions/download-artifact` | `3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c` | v8.0.1 |
-| `docker/setup-qemu-action` | `ce360397dd3f832beb865e1373c09c0e9f86d70a` | v4.0.0 |
-| `docker/setup-buildx-action` | `4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd` | v4.0.0 |
-| `docker/login-action` | `4907a6ddec9925e35a0a9e82d7399ccc52663121` | v4.1.0 |
-| `docker/build-push-action` | `bcafcacb16a39f128d818304e6c9c0c18556b85f` | v7.1.0 |
-| `trufflesecurity/trufflehog` | `37b77001d0174ebec2fcca2bd83ff83a6d45a3ab` | v3.95.3 |
+| `actions/checkout` | v6.0.2 | `de0fac2e4500dabe0009e67214ff5f5447ce83dd` |
+| `actions/upload-artifact` | v7.0.1 | `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` |
+| `actions/download-artifact` | v8.0.1 | `3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c` |
+| `docker/setup-qemu-action` | v4.0.0 | `ce360397dd3f832beb865e1373c09c0e9f86d70a` |
+| `docker/setup-buildx-action` | v4.0.0 | `4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd` |
+| `docker/login-action` | v4.1.0 | `4907a6ddec9925e35a0a9e82d7399ccc52663121` |
+| `docker/build-push-action` | v7.1.0 | `bcafcacb16a39f128d818304e6c9c0c18556b85f` |
+| `trufflesecurity/trufflehog` | v3.95.3 | `37b77001d0174ebec2fcca2bd83ff83a6d45a3ab` |
 
 ---
 
@@ -304,20 +338,20 @@ Current pins (update whenever actions are upgraded; all are node24 runtimes):
 **Triggers:** `push` to `main`/`master` touching `docker/Dockerfile.build` or the
 Gitea workflow file; quarterly schedule `0 0 1 */3 *`; `workflow_dispatch`.
 
-**Differences from GitHub version:**
-- No GHCR push — images built locally as `local/icecast:build-amd64` / `:build-arm64`
+**Differences from GitHub:**
+- No GHCR push — images built locally: `local/icecast:build-amd64` / `:build-arm64`
 - Each arch is a separate `docker buildx build --load` step
 - No `docker/login-action`, no registry cache
 
 ### Workflow: `build-linux-binaries.yml`
 
 **Triggers:** monthly schedule `0 0 1 * *`; `workflow_dispatch` only.
-*(No push trigger — Gitea has no `workflow_run` equivalent so no race risk.)*
+*(No push trigger — Gitea has no `workflow_run` equivalent, no race risk.)*
 
-**Differences from GitHub version:**
+**Differences from GitHub:**
 - Builds env image locally before running it (no pull from GHCR)
 - Uses `GITEA_TOKEN` secret for all API calls
-- Release created via `curl` to `/api/v1/repos/{REPOSITORY}/releases`
+- Release created via `curl` POST to `/api/v1/repos/{REPOSITORY}/releases`
 - Assets uploaded via `curl -F attachment=@<file>`
 - No Docker image push to GHCR
 - `SERVER_URL` / `REPOSITORY` resolved from `gitea.*` context with `github.*` fallback
@@ -328,15 +362,15 @@ Gitea workflow file; quarterly schedule `0 0 1 */3 *`; `workflow_dispatch`.
 
 | Item | Convention |
 |------|------------|
-| Git tag | `v<VERSION>` — `VERSION` from upstream `configure.ac`, no `v` prefix in the file |
+| Git tag | `v<VERSION>` — `VERSION` extracted from upstream `configure.ac`; no `v` in the value |
 | Release title | `Icecast <VERSION>` |
-| Release notes | `"Static Icecast binaries"` (single line) |
+| Release notes | `"Static Icecast binaries for Linux amd64 and arm64"` |
 | Binary names | `icecast-linux-amd64`, `icecast-linux-arm64` |
-| Checksum file | `SHA256SUMS.txt` (`sha256sum` output) |
-| Docker tags | `latest`, `<VERSION>`, `<YYMM>` — pushed together |
+| Checksum file | `SHA256SUMS.txt` (output of `sha256sum`) |
+| Docker tags | `latest`, `<VERSION>`, `<YYMM>` — pushed together in one `build-push-action` call |
 
-`VERSION` is never stored in this repository — it is extracted from upstream at build time.
-The `release.txt` / `version.txt` convention does not apply.
+`VERSION` is never stored in this repository — extracted from upstream at build time.
+The `release.txt` / `version.txt` convention does **not** apply to this project.
 
 ---
 
@@ -349,9 +383,9 @@ All variables are optional; defaults apply. `entrypoint.sh` generates
 |----------|---------|---------------------|
 | `ICECAST_HOSTNAME` | `localhost` | `<hostname>` |
 | `ICECAST_LOCATION` | `Earth` | `<location>` |
-| `ICECAST_ADMIN_EMAIL` | `{admin_user}@{hostname}` | `<admin>` |
 | `ICECAST_ADMIN_USERNAME` | `admin` | `<authentication><admin-user>` |
 | `ICECAST_ADMIN_PASSWORD` | `changeme` | `<authentication><admin-password>` |
+| `ICECAST_ADMIN_EMAIL` | `{admin_user}@{hostname}` | `<admin>` |
 | `ICECAST_SOURCE_PASSWORD` | `$STREAM_PASSWORD` → `changeme` | `<authentication><source-password>` |
 | `ICECAST_RELAY_PASSWORD` | `$STREAM_PASSWORD` → `changeme` | `<authentication><relay-password>` |
 | `ICECAST_MAX_CLIENTS` | `100` | `<limits><clients>` |
@@ -361,7 +395,7 @@ All variables are optional; defaults apply. `entrypoint.sh` generates
 | `TZ` | *(system)* | Container timezone via tzdata |
 
 Logs → stdout (`-`), captured by Docker json-file driver.
-Container user: `icecast:icecast` (non-root). Port 8000 requires no privileges.
+Container user: `icecast:icecast` (non-root). Port 8000 requires no root privileges.
 
 ---
 
@@ -371,8 +405,8 @@ Container user: `icecast:icecast` (non-root). Port 8000 requires no privileges.
 
 - `docker/Dockerfile.build` — build-environment image; embedded `build-icecast` script
 - `docker/Dockerfile.runtime` — two-stage runtime image (assets → Alpine)
-- `docker/rootfs/usr/local/bin/entrypoint.sh` — config generator; always executable
-- No Dockerfile at the repo root
+- `docker/rootfs/usr/local/bin/entrypoint.sh` — config generator; mode 755 always
+- No `Dockerfile` at the repo root — ever
 - Workflow files only in `.github/workflows/` and `.gitea/workflows/`
 
 ### Docker
@@ -381,22 +415,21 @@ Container user: `icecast:icecast` (non-root). Port 8000 requires no privileges.
 - Every `docker run` in CI must include `--rm`
 - Build containers are stateless; `/output` is the only volume mount
 - No secrets, credentials, or `.env` values baked into any image
-- Startup chain: `tini → entrypoint.sh → icecast` — never bypass tini
+- Startup chain: `tini → entrypoint.sh → icecast` — never override or bypass tini
 
 ### Secrets
 
-- `GITHUB_TOKEN` — auto-injected; used only for GHCR auth and `gh` CLI
+- `GITHUB_TOKEN` — auto-injected; used only for GHCR push and `gh` CLI
 - `GITEA_TOKEN` — repository secret; used only for Gitea API calls
 - Never hardcode tokens, passwords, or registry credentials in any file
 
-### No build artifacts committed
+### Build artifacts
 
-`binaries/`, `output/`, `artifacts/`, `release/` are never committed.
+`binaries/`, `output/`, `artifacts/`, `release/` are gitignored and never committed.
 
-### Spelling and grammar
+### Spec conflict resolution
 
-Fix clear errors in any file being edited. Never alter technical identifiers,
-upstream names, or intentional abbreviations.
+AI.md wins over IDEA.md on any conflict. Fix IDEA.md to match AI.md.
 
 ---
 
@@ -405,7 +438,7 @@ upstream names, or intentional abbreviations.
 | When | Action |
 |------|--------|
 | Session start | Read AI.md completely |
-| Before each task | Re-read relevant parts |
+| Before each task | Re-read relevant PART(s) |
 | Every 3–5 changes | Verify against spec |
-| Before task completion | Full compliance check |
-| When uncertain | Re-read spec; never guess |
+| Before task completion | Full compliance check across all PARTs |
+| When uncertain | Re-read the relevant PART; never guess |
