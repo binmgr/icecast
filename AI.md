@@ -34,9 +34,13 @@ even if the project is renamed.
 │       └── usr/local/bin/
 │           └── entrypoint.sh   # Config generator; runs as tini child
 ├── .github/
-│   └── workflows/
-│       ├── build-env-image.yml         # Rebuilds ghcr.io/{image}:build
-│       └── build-linux-binaries.yml    # Builds, releases, and pushes runtime image
+│   ├── workflows/
+│   │   ├── build-env-image.yml         # Rebuilds ghcr.io/{image}:build
+│   │   ├── build-linux-binaries.yml    # Builds, releases, and pushes runtime image
+│   │   └── security.yml                # truffleHog + Trivy scanning
+│   ├── dependabot.yml                  # Weekly action + Docker base-image updates
+│   ├── CODEOWNERS                      # Review requirements for security-sensitive paths
+│   └── SECURITY.md                     # Vulnerability reporting policy
 ├── .gitea/
 │   └── workflows/
 │       ├── build-env-image.yml         # Gitea equivalent (local images only)
