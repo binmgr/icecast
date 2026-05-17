@@ -95,6 +95,13 @@ jobs:
         id: yymm
         run: echo "tag=$(date -u +'%y%m')" >> $GITHUB_OUTPUT
 
+      - name: Verify binaries
+        run: |
+          chmod +x artifacts/icecast-linux-amd64 artifacts/icecast-linux-arm64
+          file artifacts/icecast-linux-amd64 | grep -Eq 'statically linked|static-pie linked'
+          file artifacts/icecast-linux-arm64 | grep -Eq 'statically linked|static-pie linked'
+          artifacts/icecast-linux-amd64 --version
+
       - name: Prepare release
         run: |
           mkdir release && cp artifacts/icecast-* release/
