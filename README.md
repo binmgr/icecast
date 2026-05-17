@@ -138,6 +138,15 @@ icecast -b          Run in background (daemon mode)
 
 ---
 
+## 🔒 Security
+
+To report a vulnerability privately, see [SECURITY.md](.github/SECURITY.md).
+
+For issues with Icecast itself, report to [upstream](https://gitlab.xiph.org/xiph/icecast-server/issues).
+For issues with these builds or the Docker image, open an [issue](../../issues).
+
+---
+
 ## 🛠️ Development
 
 ### CI Platforms
@@ -197,15 +206,6 @@ docker build -f docker/Dockerfile.build -t ghcr.io/binmgr/icecast:build .
 |--------|------|
 | Linux amd64 | ~5–10 min |
 | Linux arm64 | ~8–15 min (QEMU on x86 runner) |
-
----
-
-## 🔒 Security
-
-To report a vulnerability privately, see [SECURITY.md](.github/SECURITY.md).
-
-For issues with Icecast itself, report to [upstream](https://gitlab.xiph.org/xiph/icecast-server/issues).
-For issues with these builds or the Docker image, open an [issue](../../issues).
 
 ---
 
