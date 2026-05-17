@@ -1,28 +1,43 @@
-# Icecast — Static Binary Builds & Docker Image
+# Icecast
 
-Automated builds of fully static [Icecast](https://github.com/xiph/Icecast-Server) streaming media server binaries for Linux (amd64/arm64), plus a ready-to-run Docker image driven entirely by environment variables.
-
-## What is Icecast?
-
-Icecast is a streaming media server that supports Ogg Vorbis, Opus, WebM, and MP3 audio streams. It can be used to create an internet radio station, a private jukebox, or many things in between.
-
-## Features Compiled In
-
-All optional features are enabled — no feature gating:
-
-- ✅ Ogg Vorbis, Theora video, Speex codec streaming
-- ✅ TLS/SSL (OpenSSL)
-- ✅ YP directory listing (libcurl)
-- ✅ XML/XSLT configuration (libxml2 + libxslt)
-- ✅ GeoIP lookups (libmaxminddb)
-- ✅ IPv6 support
-- ✅ Web-based administration interface
-
-Every binary is fully statically linked — no shared libraries, no runtime dependencies, drop-and-run on any Linux distribution.
+Automated builds of fully static [Icecast](https://github.com/xiph/Icecast-Server) streaming media server binaries for Linux (amd64/arm64), plus a ready-to-run Docker image driven entirely by environment variables. No shared libraries, no runtime dependencies — drop-and-run on any Linux distribution.
 
 ---
 
-## Docker Image
+## 📦 Install
+
+Download the latest release from [GitHub Releases](https://github.com/binmgr/icecast/releases/latest).
+
+### Linux
+
+| Arch | Binary |
+|------|--------|
+| amd64 | `icecast-linux-amd64` |
+| arm64 | `icecast-linux-arm64` |
+
+```bash
+# Detect arch automatically
+ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+curl -LSsf "https://github.com/binmgr/icecast/releases/latest/download/icecast-linux-${ARCH}" \
+  -o /usr/local/bin/icecast && chmod +x /usr/local/bin/icecast
+```
+
+**Verify integrity:**
+
+```bash
+curl -LSsf https://github.com/binmgr/icecast/releases/latest/download/SHA256SUMS.txt \
+  | sha256sum -c --ignore-missing
+```
+
+**Run with a config file:**
+
+```bash
+icecast -c /path/to/icecast.xml
+```
+
+---
+
+## 🐳 Docker
 
 ```bash
 docker run --rm -it \
@@ -31,6 +46,8 @@ docker run --rm -it \
   -e ICECAST_ADMIN_PASSWORD=adminpass \
   ghcr.io/binmgr/icecast:latest
 ```
+
+The entrypoint generates `/etc/icecast/icecast.xml` from environment variables on every start. Logs go to stdout.
 
 ### Environment Variables
 
@@ -49,8 +66,6 @@ docker run --rm -it \
 | `STREAM_PASSWORD` | *(none)* | Legacy fallback for source and relay passwords |
 | `TZ` | system | Container timezone |
 
-The entrypoint generates `/etc/icecast/icecast.xml` from these variables on every start. Icecast logs to stdout.
-
 ### Image Tags
 
 | Tag | Description |
@@ -59,51 +74,23 @@ The entrypoint generates `/etc/icecast/icecast.xml` from these variables on ever
 | `2.5.0` | Specific upstream version |
 | `2505` | Year-month of build (YYMM) |
 
-### Compatible Source Clients
-
-The Docker image is a drop-in replacement for `libretime/icecast` and is compatible with `zerg13/ices` source clients.
+The image is a drop-in replacement for `libretime/icecast` and compatible with `zerg13/ices` source clients.
 
 ---
 
-## Static Binary Downloads
+## ⚙️ Configuration
 
-See [Releases](../../releases) for pre-built binaries.
+All optional features are compiled in — no feature gating:
 
-Each release includes:
+- ✅ Ogg Vorbis, Theora video, Speex codec streaming
+- ✅ TLS/SSL (OpenSSL)
+- ✅ YP directory listing (libcurl)
+- ✅ XML/XSLT configuration (libxml2 + libxslt)
+- ✅ GeoIP lookups (libmaxminddb)
+- ✅ IPv6 support
+- ✅ Web-based administration interface
 
-| File | Description |
-|------|-------------|
-| `icecast-linux-amd64` | Static binary for x86_64 Linux |
-| `icecast-linux-arm64` | Static binary for aarch64 Linux |
-| `SHA256SUMS.txt` | SHA-256 checksums for verification |
-
-### Quick Start
-
-```bash
-# Download for your architecture
-wget https://github.com/binmgr/icecast/releases/latest/download/icecast-linux-amd64
-
-# Make executable
-chmod +x icecast-linux-amd64
-
-# Run with a config file
-./icecast-linux-amd64 -c /path/to/icecast.xml
-```
-
-### Verify Integrity
-
-```bash
-wget https://github.com/binmgr/icecast/releases/latest/download/SHA256SUMS.txt
-sha256sum -c SHA256SUMS.txt --ignore-missing
-```
-
-### Supported Platforms
-
-Any Linux distribution on x86_64 or aarch64 — Debian, Ubuntu, RHEL/CentOS/Rocky, Alpine, Arch, and others.
-
----
-
-## Configuration
+### Config File
 
 Create an `icecast.xml` file. See the [upstream example](https://github.com/xiph/Icecast-Server/blob/master/conf/icecast.xml.dist) for all options. Minimal working config:
 
@@ -141,22 +128,17 @@ Create an `icecast.xml` file. See the [upstream example](https://github.com/xiph
 </icecast>
 ```
 
-```bash
-./icecast-linux-amd64 -c icecast.xml
-```
-
 ### Command-Line Options
 
 ```
-Usage: icecast [options]
-  -c <file>    Specify configuration file
-  -v           Display version and build information
-  -b           Run in background (daemon mode)
+icecast -c <file>   Specify configuration file
+icecast -v          Display version and build information
+icecast -b          Run in background (daemon mode)
 ```
 
 ---
 
-## Build System
+## 🛠️ Development
 
 ### CI Platforms
 
@@ -169,35 +151,34 @@ Usage: icecast [options]
 
 | File | Purpose |
 |------|---------|
-| `.github/workflows/build-env-image.yml` | Build and push `ghcr.io/binmgr/icecast:build` (quarterly + on Dockerfile.build change) |
-| `.github/workflows/build-linux-binaries.yml` | Build static binaries, create GitHub release, push runtime image |
+| `.github/workflows/build-env-image.yml` | Build and push `ghcr.io/binmgr/icecast:build` (quarterly + on `Dockerfile.build` change) |
+| `.github/workflows/build-linux-binaries.yml` | Build static binaries, verify them, create GitHub release, push runtime image |
 | `.github/workflows/security.yml` | truffleHog secret scanning + Trivy container vulnerability scan |
 
 ### How It Works
 
 1. **Build environment image** — `ghcr.io/binmgr/icecast:build` is a multi-arch Alpine image with all static libraries pre-compiled (Speex → librhash → libigloo, in that order). Rebuilt quarterly or when `docker/Dockerfile.build` changes.
-2. **Binary build** — A container runs `build-icecast <arch>` natively for each target architecture. The script clones Icecast from upstream, compiles with all features enabled, strips the binary, and verifies static linking before writing to `/output/`.
-3. **Verification** — Both binaries are checked for static linking and the amd64 binary is executed to confirm it runs before anything is published.
+2. **Binary build** — A container runs `build-icecast <arch>` natively for each target. Clones upstream, compiles with all features, strips and verifies static linking, writes to `/output/`.
+3. **Verification** — Both binaries are checked for static linking and the amd64 binary is executed before anything is published.
 4. **Release** — GitHub / Gitea release created as `v<VERSION>` with both binaries and `SHA256SUMS.txt`.
-5. **Runtime image** — Two-stage `docker/Dockerfile.runtime`: stage `assets` fetches the upstream web/admin UI files; final stage is Alpine + tini + static binary + entrypoint.
+5. **Runtime image** — Two-stage `docker/Dockerfile.runtime`: stage `assets` fetches upstream web/admin UI files; final stage is Alpine + tini + static binary + entrypoint.
 
 ### Local Build
 
-Pull the pre-built environment image from GHCR:
-
 ```bash
+# Pull the pre-built environment image
 docker pull ghcr.io/binmgr/icecast:build
 
 # Build for amd64
 mkdir -p output
-docker run --rm -it --name icecast-build \
+docker run --rm -it --name icecast-local \
   --platform=linux/amd64 \
   -v "$(pwd)/output:/output" \
   ghcr.io/binmgr/icecast:build \
   build-icecast amd64
 
 # Build for arm64 (requires QEMU or native arm64 host)
-docker run --rm -it --name icecast-build \
+docker run --rm -it --name icecast-local \
   --platform=linux/arm64 \
   -v "$(pwd)/output:/output" \
   ghcr.io/binmgr/icecast:build \
@@ -219,41 +200,18 @@ docker build -f docker/Dockerfile.build -t ghcr.io/binmgr/icecast:build .
 
 ---
 
-## Troubleshooting
-
-**Binary won't execute**
-```bash
-chmod +x icecast-linux-*
-uname -m  # Must be x86_64 (amd64) or aarch64 (arm64)
-```
-
-**Port already in use**
-```bash
-sudo lsof -i :8000
-# Change port in icecast.xml or stop the conflicting process
-```
-
-**Permission denied on log/web directories**
-Icecast needs write access to the log directory and read access to the web and admin roots. Either run as a user with those permissions or adjust ownership.
-
----
-
-## Security
+## 🔒 Security
 
 To report a vulnerability privately, see [SECURITY.md](.github/SECURITY.md).
 
 For issues with Icecast itself, report to [upstream](https://gitlab.xiph.org/xiph/icecast-server/issues).
-For issues with these builds or the Docker image, open an [issue](../../issues) here.
+For issues with these builds or the Docker image, open an [issue](../../issues).
 
 ---
 
-## Credits & License
+## 📄 License
 
-- **Icecast**: [Xiph.Org Foundation](https://www.xiph.org/) — GPL-2.0
+- **Icecast**: GPL-2.0 — see [LICENSE.md](LICENSE.md)
 - **Build workflow**: MIT License
 
-### Links
-
-- [Upstream Icecast source](https://github.com/xiph/Icecast-Server)
-- [Official Icecast documentation](https://icecast.org/docs/)
-- [Icecast.org](https://icecast.org/)
+[Upstream Icecast source](https://github.com/xiph/Icecast-Server) · [Official Icecast docs](https://icecast.org/docs/) · [Icecast.org](https://icecast.org/)
