@@ -38,7 +38,6 @@ icecast/
 │   │   ├── build-env-image.yml         # Rebuilds ghcr.io/{image}:build
 │   │   ├── build-linux-binaries.yml    # Builds, releases, and pushes runtime image
 │   │   └── security.yml                # truffleHog + Trivy scanning
-│   ├── dependabot.yml                  # Weekly action + Docker base-image updates
 │   ├── CODEOWNERS                      # Review requirements for security-sensitive paths
 │   └── SECURITY.md                     # Vulnerability reporting policy
 ├── .gitea/
@@ -50,6 +49,7 @@ icecast/
 ├── CLAUDE.md                   # Short loader + rules pointing at AI.md and IDEA.md
 ├── README.md                   # Public documentation
 ├── LICENSE.md                  # GPL-2.0 + third-party attributions
+├── renovate.json               # Renovate dependency updates (Actions + Docker base)
 ├── .dockerignore
 └── .gitignore
 ```
@@ -307,9 +307,14 @@ image has been published yet.
 
 ---
 
-### Dependabot (`.github/dependabot.yml`)
+### Renovate (`renovate.json`)
 
-Weekly updates for `github-actions` (directory `/`) and `docker` (directory `/docker`).
+Renovate (AGPL-3.0, free) — never Dependabot. Weekly schedule (Monday before 06:00 UTC).
+Managers: `github-actions` (covers `.github/workflows/` and `.gitea/workflows/`) with
+`pinDigests: true` so action upgrades land as full commit SHAs; `dockerfile` for
+`docker/Dockerfile.*`. The `alpine` base image is intentionally disabled — rolling
+`alpine:latest` is project policy. Vulnerability alerts are enabled and labelled
+`security`.
 
 ---
 

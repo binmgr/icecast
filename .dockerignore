@@ -29,6 +29,7 @@ Thumbs.db
 # docs and meta (not needed in image)
 *.md
 LICENSE*
+renovate.json
 
 # spec files
 AI.md

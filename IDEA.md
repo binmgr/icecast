@@ -124,7 +124,7 @@ At container start, `tini → entrypoint.sh → icecast`:
 - All third-party GitHub Actions pinned to full commit SHA — tags forbidden
 - Automated secret scanning via truffleHog on every push and pull request
 - Automated container vulnerability scanning via Trivy; critical/high CVE = build failure
-- Dependabot automates weekly updates for GitHub Actions and Docker base images
+- Renovate automates weekly updates for GitHub Actions and Docker images (Dependabot is not used)
 - Registry images tagged by version and YYMM; `latest` is always an alias, never sole tag
 - `SHA256SUMS.txt` in every release for end-user verification
 - Runtime container runs as non-root `icecast:icecast` user

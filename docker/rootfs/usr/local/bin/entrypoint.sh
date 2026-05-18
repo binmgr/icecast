@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # - - - - - - - - - - - - - - - - - - - - - - - - -
-##@Version           :  YYYYMMDDHHMM-git
+##@Version           :  202605180000-git
 # @@Author           :  Jason Hempstead
 # @@Contact          :  git-admin@casjaysdev.pro
 # @@License          :  GPL-2.0 or LICENSE.md
 # @@ReadME           :  entrypoint.sh --help | README.md
 # @@Copyright        :  Copyright: (c) 2026 Jason Hempstead, Casjays Developments
-# @@Created          :  Thursday, May 15, 2026 00:00 EDT
+# @@Created          :  Friday, May 15, 2026 00:00 EDT
 # @@File             :  entrypoint.sh
 # @@Description      :  Generate icecast.xml from env vars and exec icecast
 # @@Changelog        :  New file
@@ -20,7 +20,7 @@
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # shellcheck disable=SC1001,SC1003,SC2001,SC2003,SC2016,SC2031,SC2090,SC2115,SC2120,SC2155,SC2199,SC2229,SC2317,SC2329
 # - - - - - - - - - - - - - - - - - - - - - - - - -
-VERSION="YYYYMMDDHHMM-git"
+VERSION="202605180000-git"
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 
 set -euo pipefail
