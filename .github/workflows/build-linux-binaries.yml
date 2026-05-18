@@ -95,6 +95,10 @@ jobs:
         id: yymm
         run: echo "tag=$(date -u +'%y%m')" >> $GITHUB_OUTPUT
 
+      - name: Get build date
+        id: date
+        run: echo "value=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
       - name: Verify binaries
         run: |
           chmod +x artifacts/icecast-linux-amd64 artifacts/icecast-linux-arm64
@@ -115,6 +119,9 @@ jobs:
           gh release create "v${{ steps.ver.outputs.version }}" --title "Icecast ${{ steps.ver.outputs.version }}" \
             --notes "Static Icecast binaries for Linux amd64 and arm64" release/*
 
+      - uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a  # v4.0.0
+        with:
+          platforms: amd64,arm64
       - uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd  # v4.0.0
       - uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121  # v4.1.0
         with:
@@ -131,7 +138,7 @@ jobs:
           push: true
           build-args: |
             VERSION=${{ steps.ver.outputs.version }}
-            BUILD_DATE=${{ github.event.repository.updated_at }}
+            BUILD_DATE=${{ steps.date.outputs.value }}
             VCS_REF=${{ github.sha }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
