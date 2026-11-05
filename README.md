@@ -213,6 +213,8 @@ Or use the Makefile (`make build-env`, `make build ARCH=amd64`, `make validate`,
 docker build -f docker/Dockerfile.build -t ghcr.io/binmgr/icecast:build .
 ```
 
+Set `JOBS=<n>` in the build container's environment (`docker run -e JOBS=4 …`) to override the parallel make jobs; arm64 defaults to 1.
+
 ### Approximate Build Times
 
 | Target | Time |
