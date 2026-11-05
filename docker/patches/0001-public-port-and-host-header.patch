@@ -1,17 +1,19 @@
 diff --git a/src/client.c b/src/client.c
-index 1732a8a674ee..aa585674236a 100644
+index 1732a8a674ee..9eb6a576287c 100644
 --- a/src/client.c
 +++ b/src/client.c
-@@ -1091,6 +1091,8 @@ ssize_t client_get_baseurl(client_t *client, listensocket_t *listensocket, char
+@@ -1091,6 +1091,10 @@ ssize_t client_get_baseurl(client_t *client, listensocket_t *listensocket, char
      const char *host = NULL;
      const char *proto = "http";
      int port = 0;
 +    int host_from_header = 0;
 +    const char *public_port = NULL;
++    const char *forwarded_proto = NULL;
++    const char *public_scheme = NULL;
      ssize_t ret;
      tlsmode_t tlsmode = ICECAST_TLSMODE_AUTO;
      protocol_t protocol = ICECAST_PROTOCOL_HTTP;
-@@ -1110,13 +1112,11 @@ ssize_t client_get_baseurl(client_t *client, listensocket_t *listensocket, char
+@@ -1110,13 +1114,11 @@ ssize_t client_get_baseurl(client_t *client, listensocket_t *listensocket, char
      if (client) {
          host = httpp_getvar(client->parser, "host");
  
@@ -30,7 +32,7 @@ index 1732a8a674ee..aa585674236a 100644
  
          listensocket = client->con->listensocket_effective;
          tlsmode = client->con->tlsmode;
-@@ -1141,6 +1141,12 @@ ssize_t client_get_baseurl(client_t *client, listensocket_t *listensocket, char
+@@ -1141,6 +1143,12 @@ ssize_t client_get_baseurl(client_t *client, listensocket_t *listensocket, char
              port = config->port;
      }
  
@@ -43,3 +45,27 @@ index 1732a8a674ee..aa585674236a 100644
      switch (tlsmode) {
          case ICECAST_TLSMODE_DISABLED:
          case ICECAST_TLSMODE_AUTO:
+@@ -1159,6 +1167,23 @@ ssize_t client_get_baseurl(client_t *client, listensocket_t *listensocket, char
+             break;
+     }
+ 
++    /* binmgr: behind a TLS-terminating reverse proxy the connection to us is
++     * plain HTTP. Prefer the proxy's X-Forwarded-Proto, then ICECAST_PUBLIC_SCHEME
++     * (http or https); only plain HTTP clients are affected, never icy/icys. */
++    if (protocol == ICECAST_PROTOCOL_HTTP) {
++        if (client)
++            forwarded_proto = httpp_getvar(client->parser, "x-forwarded-proto");
++        public_scheme = getenv("ICECAST_PUBLIC_SCHEME");
++        if (forwarded_proto && strncmp(forwarded_proto, "https", 5) == 0)
++            proto = "https";
++        else if (forwarded_proto && strncmp(forwarded_proto, "http", 4) == 0)
++            proto = "http";
++        else if (public_scheme && strcmp(public_scheme, "https") == 0)
++            proto = "https";
++        else if (public_scheme && strcmp(public_scheme, "http") == 0)
++            proto = "http";
++    }
++
+     if (host && port) {
+         ret = snprintf(buf, len, "%s%s://%s%s%s%s%s:%i%s%s", prefix, proto, user ? user : "", pw ? ":" : "", pw ? pw : "", (user || pw) ? "@" : "", host, port, suffix0, suffix1);
+     } else if (host) {

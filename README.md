@@ -67,13 +67,14 @@ The entrypoint generates `/etc/icecast/icecast.xml` from environment variables o
 | `ICECAST_SOURCE_TIMEOUT` | `60` | Seconds the source may send no data before it (and its listeners) are dropped |
 | `ICECAST_MAX_LISTENER_DURATION` | `0` | Per-listener connection limit in seconds; `0` = unlimited |
 | `ICECAST_PUBLIC_PORT` | *(unset)* | Port advertised in playlists/URLs when the request carries no `Host` header; `0` omits the port |
+| `ICECAST_PUBLIC_SCHEME` | *(unset)* | `http` or `https` for playlist URLs when the request has no `X-Forwarded-Proto` header |
 | `STREAM_PORT` | `8000` | TCP port Icecast listens on |
 | `STREAM_PASSWORD` | *(none)* | Legacy fallback for source and relay passwords |
 | `TZ` | system | Container timezone |
 
 Each listener uses one file descriptor. The entrypoint raises the soft limit to the container's hard limit; for large audiences start the container with a high limit, e.g. `--ulimit nofile=65536:65536`.
 
-**Behind a reverse proxy:** playlists (`/mount.m3u`, `/mount.xspf`) use the request's `Host` header. A header without a port is trusted, so `http://radio.example.com/mount` is advertised instead of `:8000`. Set `ICECAST_PUBLIC_PORT` only for requests that carry no `Host` header (`0` omits the port).
+**Behind a reverse proxy:** playlists (`/mount.m3u`, `/mount.xspf`) use the request's `Host` header. A header without a port is trusted, so `http://radio.example.com/mount` is advertised instead of `:8000`. `X-Forwarded-Proto: https` from the proxy makes playlists use `https://`. Set `ICECAST_PUBLIC_PORT` only for requests that carry no `Host` header (`0` omits the port).
 
 ### Image Tags
 

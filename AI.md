@@ -411,6 +411,7 @@ All variables are optional; defaults apply. `entrypoint.sh` generates
 | `ICECAST_RELAY_PASSWORD` | `$STREAM_PASSWORD` → `changeme` | `<authentication><relay-password>` |
 | `ICECAST_MAX_CLIENTS` | `9999` | `<limits><clients>` |
 | `ICECAST_MAX_SOURCES` | `2` | `<limits><sources>` |
+| `ICECAST_PUBLIC_SCHEME` | *(unset)* | Read by the patched `client_get_baseurl()` (not written to the config) |
 | `ICECAST_PUBLIC_PORT` | *(unset)* | Read by the patched `client_get_baseurl()` (not written to the config) |
 | `ICECAST_QUEUE_SIZE` | `4194304` | `<limits><queue-size>` |
 | `ICECAST_CLIENT_TIMEOUT` | `120` | `<limits><client-timeout>` |

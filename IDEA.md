@@ -109,6 +109,7 @@ Upstream Icecast ignores a `Host` header that has no port and then advertises th
 | `ICECAST_SOURCE_TIMEOUT` | `60` | Seconds the source may send no data before it (and its listeners) are dropped |
 | `ICECAST_MAX_LISTENER_DURATION` | `0` | Per-listener connection limit in seconds; `0` = unlimited |
 | `ICECAST_PUBLIC_PORT` | *(unset)* | Port advertised in playlists/URLs when the request carries no `Host` header; `0` omits the port |
+| `ICECAST_PUBLIC_SCHEME` | *(unset)* | `http` or `https` for playlist URLs when the request has no `X-Forwarded-Proto` header |
 | `STREAM_PORT` | `8000` | TCP port Icecast listens on |
 | `STREAM_PASSWORD` | *(none)* | Legacy fallback for source and relay passwords |
 | `TZ` | system | Container timezone (tzdata) |
