@@ -173,13 +173,13 @@ For issues with these builds or the Docker image, open an [issue](../../issues).
 
 | File | Purpose |
 |------|---------|
-| `.github/workflows/build-env-image.yml` | Build and push `ghcr.io/binmgr/icecast:build` (quarterly + on `Dockerfile.build` change) |
+| `.github/workflows/build-env-image.yml` | Build and push `ghcr.io/binmgr/icecast:build` (quarterly + on `Dockerfile.build` or `docker/patches/` change) |
 | `.github/workflows/build-linux-binaries.yml` | Build static binaries, verify them, create GitHub release, push runtime image |
 | `.github/workflows/security.yml` | truffleHog secret scanning + Trivy container vulnerability scan |
 
 ### How It Works
 
-1. **Build environment image** — `ghcr.io/binmgr/icecast:build` is a multi-arch Alpine image with all static libraries pre-compiled (Speex → librhash → libigloo, in that order). Rebuilt quarterly or when `docker/Dockerfile.build` changes.
+1. **Build environment image** — `ghcr.io/binmgr/icecast:build` is a multi-arch Alpine image with all static libraries pre-compiled (Speex → librhash → libigloo, in that order). Rebuilt quarterly or when `docker/Dockerfile.build` or `docker/patches/` changes.
 2. **Binary build** — A container runs `build-icecast <arch>` natively for each target. Clones upstream, compiles with all features, strips and verifies static linking, writes to `/output/`.
 3. **Verification** — Both binaries are checked for static linking and the amd64 binary is executed before anything is published.
 4. **Release** — GitHub / Gitea / Forgejo release created as `v<VERSION>` with both binaries and `SHA256SUMS.txt`.
