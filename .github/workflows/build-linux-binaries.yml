@@ -3,7 +3,7 @@ name: Build Linux Binaries
 on:
   push:
     branches: [main, master]
-    paths: ['docker/Dockerfile.runtime']
+    paths: ['docker/Dockerfile.runtime', 'docker/rootfs/**']
   schedule:
     - cron: '0 0 1 * *'
   workflow_run:

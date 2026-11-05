@@ -157,7 +157,7 @@ For issues with these builds or the Docker image, open an [issue](../../issues).
 
 | Platform | Triggers | Notes |
 |----------|----------|-------|
-| **GitHub Actions** | `workflow_run` (after env image), monthly schedule, `Dockerfile.runtime` push, `workflow_dispatch` | Pushes images to GHCR; creates GitHub releases |
+| **GitHub Actions** | `workflow_run` (after env image), monthly schedule, `Dockerfile.runtime` or `docker/rootfs/` push, `workflow_dispatch` | Pushes images to GHCR; creates GitHub releases |
 | **Gitea Actions** | Monthly schedule, `workflow_dispatch` | Builds images locally; creates Gitea releases via API |
 | **Forgejo Actions** | Same as Gitea | Mirror of the Gitea workflows |
 | **GitLab CI** | Pipeline on main/master, schedules | Docker-in-docker; pulls or builds the build image; uploads release packages on tags |
