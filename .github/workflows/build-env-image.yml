@@ -3,7 +3,7 @@ name: Build Environment Image
 on:
   push:
     branches: [main, master]
-    paths: ['docker/Dockerfile.build', '.github/workflows/build-env-image.yml']
+    paths: ['docker/Dockerfile.build', 'docker/patches/**', '.github/workflows/build-env-image.yml']
   schedule:
     - cron: '0 0 1 */3 *'
   workflow_dispatch:
