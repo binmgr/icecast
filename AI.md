@@ -411,6 +411,10 @@ All variables are optional; defaults apply. `entrypoint.sh` generates
 | `ICECAST_RELAY_PASSWORD` | `$STREAM_PASSWORD` → `changeme` | `<authentication><relay-password>` |
 | `ICECAST_MAX_CLIENTS` | `100` | `<limits><clients>` |
 | `ICECAST_MAX_SOURCES` | `2` | `<limits><sources>` |
+| `ICECAST_QUEUE_SIZE` | `4194304` | `<limits><queue-size>` |
+| `ICECAST_CLIENT_TIMEOUT` | `120` | `<limits><client-timeout>` |
+| `ICECAST_SOURCE_TIMEOUT` | `60` | `<limits><source-timeout>` |
+| `ICECAST_MAX_LISTENER_DURATION` | `0` | `<mount type="default"><max-listener-duration>` |
 | `STREAM_PORT` | `8000` | `<listen-socket><port>` |
 | `STREAM_PASSWORD` | *(none)* | Legacy fallback for `SOURCE_` and `RELAY_` passwords |
 | `TZ` | *(system)* | Container timezone via tzdata |

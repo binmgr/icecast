@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # - - - - - - - - - - - - - - - - - - - - - - - - -
-##@Version           :  202605180000-git
+##@Version           :  202611051520-git
 # @@Author           :  Jason Hempstead
 # @@Contact          :  git-admin@casjaysdev.pro
 # @@License          :  GPL-2.0 or LICENSE.md
@@ -10,7 +10,7 @@
 # @@Created          :  Friday, May 15, 2026 00:00 EDT
 # @@File             :  entrypoint.sh
 # @@Description      :  Generate icecast.xml from env vars and exec icecast
-# @@Changelog        :  New file
+# @@Changelog        :  Radio-style limits: configurable queue-size, client/source timeouts, unlimited listener duration
 # @@TODO             :
 # @@Other            :  Called by: tini -> entrypoint.sh -> icecast
 # @@Resource         :  https://icecast.org/docs/icecast-trunk/config_file/
@@ -20,7 +20,7 @@
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # shellcheck disable=SC1001,SC1003,SC2001,SC2003,SC2016,SC2031,SC2090,SC2115,SC2120,SC2155,SC2199,SC2229,SC2317,SC2329
 # - - - - - - - - - - - - - - - - - - - - - - - - -
-VERSION="202605180000-git"
+VERSION="202611051520-git"
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 
 set -euo pipefail
@@ -32,6 +32,16 @@ ICECAST_HOSTNAME="${ICECAST_HOSTNAME:-localhost}"
 ICECAST_LOCATION="${ICECAST_LOCATION:-Earth}"
 ICECAST_MAX_CLIENTS="${ICECAST_MAX_CLIENTS:-100}"
 ICECAST_MAX_SOURCES="${ICECAST_MAX_SOURCES:-2}"
+
+# Radio-style continuity: listeners are never dropped on a timer.
+# queue-size is the shared per-source buffer; a listener only gets dropped when it falls further behind than this
+ICECAST_QUEUE_SIZE="${ICECAST_QUEUE_SIZE:-4194304}"
+# Seconds a listener connection may stall before it is dropped
+ICECAST_CLIENT_TIMEOUT="${ICECAST_CLIENT_TIMEOUT:-120}"
+# Seconds a source may send no data before it (and its listeners) are dropped; tolerates track gaps and encoder restarts
+ICECAST_SOURCE_TIMEOUT="${ICECAST_SOURCE_TIMEOUT:-60}"
+# Per-listener connection limit in seconds; 0 = unlimited
+ICECAST_MAX_LISTENER_DURATION="${ICECAST_MAX_LISTENER_DURATION:-0}"
 
 # Passwords — STREAM_PASSWORD is the legacy fallback used by ices/libretime
 ICECAST_SOURCE_PASSWORD="${ICECAST_SOURCE_PASSWORD:-${STREAM_PASSWORD:-changeme}}"
@@ -72,10 +82,10 @@ cat > /etc/icecast/icecast.xml <<XMLEOF
     <limits>
         <clients>$(__xml_escape "${ICECAST_MAX_CLIENTS}")</clients>
         <sources>$(__xml_escape "${ICECAST_MAX_SOURCES}")</sources>
-        <queue-size>524288</queue-size>
-        <client-timeout>30</client-timeout>
+        <queue-size>$(__xml_escape "${ICECAST_QUEUE_SIZE}")</queue-size>
+        <client-timeout>$(__xml_escape "${ICECAST_CLIENT_TIMEOUT}")</client-timeout>
         <header-timeout>15</header-timeout>
-        <source-timeout>10</source-timeout>
+        <source-timeout>$(__xml_escape "${ICECAST_SOURCE_TIMEOUT}")</source-timeout>
         <burst-on-connect>1</burst-on-connect>
         <burst-size>65535</burst-size>
     </limits>
@@ -94,6 +104,10 @@ cat > /etc/icecast/icecast.xml <<XMLEOF
     </listen-socket>
 
     <fileserve>1</fileserve>
+
+    <mount type="default">
+        <max-listener-duration>$(__xml_escape "${ICECAST_MAX_LISTENER_DURATION}")</max-listener-duration>
+    </mount>
 
     <paths>
         <basedir>/usr/share/icecast</basedir>

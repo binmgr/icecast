@@ -62,6 +62,10 @@ The entrypoint generates `/etc/icecast/icecast.xml` from environment variables o
 | `ICECAST_RELAY_PASSWORD` | `$STREAM_PASSWORD` → `changeme` | Relay client auth |
 | `ICECAST_MAX_CLIENTS` | `100` | Maximum simultaneous listeners |
 | `ICECAST_MAX_SOURCES` | `2` | Maximum simultaneous source streams |
+| `ICECAST_QUEUE_SIZE` | `4194304` | Shared per-stream buffer in bytes; a listener is only dropped if it falls further behind than this |
+| `ICECAST_CLIENT_TIMEOUT` | `120` | Seconds a listener connection may stall before it is dropped |
+| `ICECAST_SOURCE_TIMEOUT` | `60` | Seconds the source may send no data before it (and its listeners) are dropped |
+| `ICECAST_MAX_LISTENER_DURATION` | `0` | Per-listener connection limit in seconds; `0` = unlimited |
 | `STREAM_PORT` | `8000` | TCP port Icecast listens on |
 | `STREAM_PASSWORD` | *(none)* | Legacy fallback for source and relay passwords |
 | `TZ` | system | Container timezone |

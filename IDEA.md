@@ -83,6 +83,10 @@ At container start, `tini → entrypoint.sh → icecast`:
   and writes `/etc/icecast/icecast.xml`
 - Icecast logs go to stdout (captured by Docker json-file driver)
 
+### Continuous-stream behavior
+
+The image behaves like a radio station: listeners stay connected for as long as the stream plays. No timer disconnects a listener (`max-listener-duration` is `0`), the shared queue is large enough that slow clients are not dropped, and the source timeout tolerates track gaps and encoder restarts without tearing down every listener.
+
 ### Runtime environment variables
 
 | Variable | Default | Purpose |
@@ -96,6 +100,10 @@ At container start, `tini → entrypoint.sh → icecast`:
 | `ICECAST_RELAY_PASSWORD` | `$STREAM_PASSWORD` → `changeme` | Relay client auth |
 | `ICECAST_MAX_CLIENTS` | `100` | Maximum simultaneous listeners |
 | `ICECAST_MAX_SOURCES` | `2` | Maximum simultaneous source streams |
+| `ICECAST_QUEUE_SIZE` | `4194304` | Shared per-stream buffer in bytes; a listener is only dropped if it falls further behind than this |
+| `ICECAST_CLIENT_TIMEOUT` | `120` | Seconds a listener connection may stall before it is dropped |
+| `ICECAST_SOURCE_TIMEOUT` | `60` | Seconds the source may send no data before it (and its listeners) are dropped |
+| `ICECAST_MAX_LISTENER_DURATION` | `0` | Per-listener connection limit in seconds; `0` = unlimited |
 | `STREAM_PORT` | `8000` | TCP port Icecast listens on |
 | `STREAM_PASSWORD` | *(none)* | Legacy fallback for source and relay passwords |
 | `TZ` | system | Container timezone (tzdata) |
