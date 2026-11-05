@@ -48,6 +48,8 @@ RUN git clone --depth 1 https://gitlab.xiph.org/xiph/icecast-libigloo.git /tmp/i
 WORKDIR /build
 
 # Build script
+COPY docker/patches/ /opt/patches/
+
 COPY <<'EOF' /usr/local/bin/build-icecast
 #!/bin/sh
 set -eu
@@ -89,6 +91,12 @@ cd /build
 rm -rf Icecast-Server
 git clone --depth 1 --recursive https://github.com/xiph/Icecast-Server.git Icecast-Server
 cd Icecast-Server
+
+# Apply local patches (playlist URL host/port handling); a failing patch must stop the build
+for patch_file in /opt/patches/*.patch; do
+    patch -p1 < "${patch_file}"
+done
+
 VERSION=$(sed -n 's/^AC_INIT(\[Icecast\], \[\([0-9.]*\)\].*/\1/p' configure.ac || echo "2.5.0")
 
 autoreconf -fi

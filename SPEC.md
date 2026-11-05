@@ -5,6 +5,12 @@ AI.md > SPEC.md > global ~/.claude/CLAUDE.md.
 
 ---
 
+## Local source patch
+
+Global project rules prefer unmodified upstream source. Icecast has no setting for the public port in generated playlists and ignores a portless `Host` header, so the build applies the patches in `docker/patches/` before compiling. `build-icecast` stops on any patch that fails to apply; update the patch when upstream changes the surrounding code. Do not drop the patch without replacing the proxy-safe playlist behavior.
+
+---
+
 ## Toolchain container
 
 Global conventions prescribe language-specific toolchain images

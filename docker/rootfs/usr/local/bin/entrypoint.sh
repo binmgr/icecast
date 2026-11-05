@@ -20,7 +20,7 @@
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # shellcheck disable=SC1001,SC1003,SC2001,SC2003,SC2016,SC2031,SC2090,SC2115,SC2120,SC2155,SC2199,SC2229,SC2317,SC2329
 # - - - - - - - - - - - - - - - - - - - - - - - - -
-VERSION="202611051520-git"
+export VERSION="202611051520-git"
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 
 set -euo pipefail
@@ -30,7 +30,7 @@ set -euo pipefail
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 ICECAST_HOSTNAME="${ICECAST_HOSTNAME:-localhost}"
 ICECAST_LOCATION="${ICECAST_LOCATION:-Earth}"
-ICECAST_MAX_CLIENTS="${ICECAST_MAX_CLIENTS:-100}"
+ICECAST_MAX_CLIENTS="${ICECAST_MAX_CLIENTS:-9999}"
 ICECAST_MAX_SOURCES="${ICECAST_MAX_SOURCES:-2}"
 
 # Radio-style continuity: listeners are never dropped on a timer.
@@ -129,6 +129,11 @@ cat > /etc/icecast/icecast.xml <<XMLEOF
     </security>
 </icecast>
 XMLEOF
+
+# - - - - - - - - - - - - - - - - - - - - - - - - -
+# Every listener is a file descriptor: raise the soft limit to the hard limit (best effort)
+# - - - - - - - - - - - - - - - - - - - - - - - - -
+ulimit -n "$(ulimit -Hn)" 2>/dev/null || true
 
 # - - - - - - - - - - - - - - - - - - - - - - - - -
 # Exec icecast — replaces this shell so tini receives signals directly

@@ -1,1 +1,0 @@
-- [ ] entrypoint.sh: shellcheck SC2034 on line 23 (`VERSION` appears unused); pre-existing, add `export`/use it in a --version path or an explicit disable

@@ -87,6 +87,10 @@ At container start, `tini → entrypoint.sh → icecast`:
 
 The image behaves like a radio station: listeners stay connected for as long as the stream plays. No timer disconnects a listener (`max-listener-duration` is `0`), the shared queue is large enough that slow clients are not dropped, and the source timeout tolerates track gaps and encoder restarts without tearing down every listener.
 
+### Playlist and URL generation
+
+Upstream Icecast ignores a `Host` header that has no port and then advertises the internal listen port (`:8000`), which breaks `.m3u` and `.xspf` playlists behind a reverse proxy on 80/443. The build applies `docker/patches/0001-public-port-and-host-header.patch`: a `Host` header without a port is trusted and the port is omitted, and `ICECAST_PUBLIC_PORT` overrides the port when no `Host` header is present (`0` omits it).
+
 ### Runtime environment variables
 
 | Variable | Default | Purpose |
@@ -98,12 +102,13 @@ The image behaves like a radio station: listeners stay connected for as long as 
 | `ICECAST_ADMIN_EMAIL` | `{admin_user}@{hostname}` | Admin contact shown in listings |
 | `ICECAST_SOURCE_PASSWORD` | `$STREAM_PASSWORD` → `changeme` | Source client auth |
 | `ICECAST_RELAY_PASSWORD` | `$STREAM_PASSWORD` → `changeme` | Relay client auth |
-| `ICECAST_MAX_CLIENTS` | `100` | Maximum simultaneous listeners |
+| `ICECAST_MAX_CLIENTS` | `9999` | Maximum simultaneous listeners |
 | `ICECAST_MAX_SOURCES` | `2` | Maximum simultaneous source streams |
 | `ICECAST_QUEUE_SIZE` | `4194304` | Shared per-stream buffer in bytes; a listener is only dropped if it falls further behind than this |
 | `ICECAST_CLIENT_TIMEOUT` | `120` | Seconds a listener connection may stall before it is dropped |
 | `ICECAST_SOURCE_TIMEOUT` | `60` | Seconds the source may send no data before it (and its listeners) are dropped |
 | `ICECAST_MAX_LISTENER_DURATION` | `0` | Per-listener connection limit in seconds; `0` = unlimited |
+| `ICECAST_PUBLIC_PORT` | *(unset)* | Port advertised in playlists/URLs when the request carries no `Host` header; `0` omits the port |
 | `STREAM_PORT` | `8000` | TCP port Icecast listens on |
 | `STREAM_PASSWORD` | *(none)* | Legacy fallback for source and relay passwords |
 | `TZ` | system | Container timezone (tzdata) |
