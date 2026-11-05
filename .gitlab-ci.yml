@@ -1,0 +1,120 @@
+stages:
+  - build
+  - security
+  - release
+
+variables:
+  BUILD_IMAGE: ghcr.io/binmgr/icecast:build
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_TLS_CERTDIR: ""
+
+# ── Build ──────────────────────────────────────────────────────────────────
+
+.build-linux:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker run --privileged --rm --name "binfmt-${CI_JOB_ID}" tonistiigi/binfmt --install arm64
+    - docker pull "$BUILD_IMAGE" 2>/dev/null ||
+      docker build -f docker/Dockerfile.build -t "$BUILD_IMAGE" .
+  artifacts:
+    expire_in: 7 days
+
+build-linux-amd64:
+  extends: .build-linux
+  script:
+    - mkdir -p output
+    - docker run --rm --platform linux/amd64 --name "icecast-build-amd64-${CI_JOB_ID}"
+        -v "${CI_PROJECT_DIR}/output:/output"
+        "$BUILD_IMAGE" build-icecast amd64
+  artifacts:
+    paths:
+      - output/icecast-linux-amd64
+      - output/VERSION
+
+build-linux-arm64:
+  extends: .build-linux
+  script:
+    - mkdir -p output
+    - docker run --rm --platform linux/arm64 --name "icecast-build-arm64-${CI_JOB_ID}"
+        -v "${CI_PROJECT_DIR}/output:/output"
+        "$BUILD_IMAGE" build-icecast arm64
+  artifacts:
+    paths:
+      - output/icecast-linux-arm64
+
+# ── Security ───────────────────────────────────────────────────────────────
+
+secret-scan:
+  stage: security
+  image: trufflesecurity/trufflehog:latest
+  variables:
+    GIT_DEPTH: 0
+  script:
+    - trufflehog git file://. --since-commit HEAD~1 --only-verified --fail
+
+workflow-policy:
+  stage: security
+  image: alpine:latest
+  script:
+    - |
+      bad=0
+      for file in .github/workflows/*.yml .gitea/workflows/*.yml .forgejo/workflows/*.yml; do
+        [ -f "$file" ] || continue
+        while IFS= read -r line; do
+          if printf '%s' "$line" | grep -qE '^\s+uses:\s+[a-zA-Z0-9_.-]+/[a-zA-Z0-9_./-]+@'; then
+            sha=$(printf '%s' "$line" | sed -E 's/.*@([^ #]+).*/\1/')
+            if ! printf '%s' "$sha" | grep -qxE '[0-9a-f]{40}'; then
+              echo "Unpinned action in ${file}: $(printf '%s' "$line" | xargs)"
+              bad=1
+            fi
+          fi
+        done < "$file"
+        if grep -qE '^\s*pull_request_target\s*:' "$file"; then
+          echo "Dangerous trigger pull_request_target in ${file}"
+          bad=1
+        fi
+      done
+      [ "$bad" -eq 0 ] || exit 1
+
+image-scan:
+  stage: security
+  image: alpine:latest
+  script:
+    - apk add --no-cache curl
+    - curl -qLSsf https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh
+        | sh -s -- -b /usr/local/bin
+    - trivy image --exit-code 1 --ignore-unfixed --severity CRITICAL,HIGH
+        ghcr.io/binmgr/icecast:latest
+
+# ── Release ────────────────────────────────────────────────────────────────
+
+release:
+  stage: release
+  image: alpine:latest
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+  needs:
+    - build-linux-amd64
+    - build-linux-arm64
+  script:
+    - apk add --no-cache curl jq
+    - mkdir -p release
+    - cp output/icecast-linux-amd64 release/ 2>/dev/null || true
+    - cp output/icecast-linux-arm64 release/ 2>/dev/null || true
+    - chmod +x release/*
+    - cd release && sha256sum * > checksums.txt
+    - |
+      TAG="$CI_COMMIT_TAG"
+      for file in *; do
+        [ -f "$file" ] || continue
+        curl -qsSf --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+          --upload-file "$file" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/icecast/${TAG#v}/${file}"
+      done
+  artifacts:
+    paths:
+      - release/
+    expire_in: 30 days

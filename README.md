@@ -155,6 +155,9 @@ For issues with these builds or the Docker image, open an [issue](../../issues).
 |----------|----------|-------|
 | **GitHub Actions** | `workflow_run` (after env image), monthly schedule, `Dockerfile.runtime` push, `workflow_dispatch` | Pushes images to GHCR; creates GitHub releases |
 | **Gitea Actions** | Monthly schedule, `workflow_dispatch` | Builds images locally; creates Gitea releases via API |
+| **Forgejo Actions** | Same as Gitea | Mirror of the Gitea workflows |
+| **GitLab CI** | Pipeline on main/master, schedules | Docker-in-docker; pulls or builds the build image; uploads release packages on tags |
+| **Jenkins** | Pipeline run | Build and security scans; release artifacts archived on tags |
 
 ### Workflows
 
@@ -169,7 +172,7 @@ For issues with these builds or the Docker image, open an [issue](../../issues).
 1. **Build environment image** — `ghcr.io/binmgr/icecast:build` is a multi-arch Alpine image with all static libraries pre-compiled (Speex → librhash → libigloo, in that order). Rebuilt quarterly or when `docker/Dockerfile.build` changes.
 2. **Binary build** — A container runs `build-icecast <arch>` natively for each target. Clones upstream, compiles with all features, strips and verifies static linking, writes to `/output/`.
 3. **Verification** — Both binaries are checked for static linking and the amd64 binary is executed before anything is published.
-4. **Release** — GitHub / Gitea release created as `v<VERSION>` with both binaries and `SHA256SUMS.txt`.
+4. **Release** — GitHub / Gitea / Forgejo release created as `v<VERSION>` with both binaries and `SHA256SUMS.txt`.
 5. **Runtime image** — Two-stage `docker/Dockerfile.runtime`: stage `assets` fetches upstream web/admin UI files; final stage is Alpine + tini + static binary + entrypoint.
 
 ### Local Build
@@ -194,7 +197,7 @@ docker run --rm -it --name icecast-local \
   build-icecast arm64
 ```
 
-Or build the environment image yourself:
+Or use the Makefile (`make build-env`, `make build ARCH=amd64`, `make validate`, `make test`), or build the environment image yourself:
 
 ```bash
 docker build -f docker/Dockerfile.build -t ghcr.io/binmgr/icecast:build .

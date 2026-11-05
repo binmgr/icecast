@@ -9,8 +9,8 @@ jobs:
   build-and-release:
     runs-on: ubuntu-latest
     env:
-      SERVER_URL: ${{ gitea.server_url || github.server_url }}
-      REPOSITORY: ${{ gitea.repository || github.repository }}
+      SERVER_URL: ${{ github.server_url }}
+      REPOSITORY: ${{ github.repository }}
       GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2

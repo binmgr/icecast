@@ -39,11 +39,20 @@ icecast/
 │   │   ├── build-linux-binaries.yml    # Builds, releases, and pushes runtime image
 │   │   └── security.yml                # truffleHog + Trivy scanning
 │   ├── CODEOWNERS                      # Review requirements for security-sensitive paths
+│   ├── ISSUE_TEMPLATE/                 # bug_report.md, feature_request.md
+│   ├── pull_request_template.md
 │   └── SECURITY.md                     # Vulnerability reporting policy
 ├── .gitea/
 │   └── workflows/
 │       ├── build-env-image.yml         # Gitea equivalent (local images only)
-│       └── build-linux-binaries.yml    # Gitea release via API
+│       ├── build-linux-binaries.yml    # Gitea release via API
+│       └── security.yml                # Same scans as GitHub
+├── .forgejo/
+│   └── workflows/                      # Forgejo mirror of .gitea/workflows/
+├── .gitlab-ci.yml                      # GitLab CI (docker-in-docker, QEMU binfmt for arm64)
+├── Jenkinsfile                         # Jenkins pipeline (build + security, no hosted release)
+├── Makefile                            # build-env, build, validate, test, clean
+├── .actrc                              # act config for local workflow validation
 ├── AI.md                       # THE HOW (this file) — implementation spec
 ├── IDEA.md                     # THE WHAT — project description, variables, logic
 ├── CLAUDE.md                   # Short loader + rules pointing at AI.md and IDEA.md
@@ -359,7 +368,14 @@ Gitea workflow file; quarterly schedule `0 0 1 */3 *`; `workflow_dispatch`.
 - Release created via `curl` POST to `/api/v1/repos/{REPOSITORY}/releases`
 - Assets uploaded via `curl -F attachment=@<file>`
 - No Docker image push to GHCR
-- `SERVER_URL` / `REPOSITORY` resolved from `gitea.*` context with `github.*` fallback
+- `SERVER_URL` / `REPOSITORY` resolved from the `github.*` context (aliased by Gitea and Forgejo, and understood by `act`)
+
+---
+
+### Forgejo, GitLab, Jenkins
+
+- **Forgejo** (`.forgejo/workflows/`) mirrors the Gitea workflows exactly.
+- **GitLab** (`.gitlab-ci.yml`) and **Jenkins** (`Jenkinsfile`) pull `ghcr.io/binmgr/icecast:build` (falling back to a local build), install QEMU binfmt for arm64, run `build-icecast <arch>` per architecture, and run the same security scans.
 
 ---
 
